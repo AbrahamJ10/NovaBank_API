@@ -79,7 +79,9 @@ export async function login(input: LoginInput, meta: RequestMeta) {
     await prisma.loginEvent.create({
       data: { userId: user.id, email: user.email, result: "ACCOUNT_LOCKED", ip: meta.ip, userAgent: meta.userAgent },
     });
-    throw new HttpError(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos");
+    throw new HttpError(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos", {
+      lockedUntil: user.lockedUntil.toISOString(),
+    });
   }
 
   if (!user.isActive) {
@@ -94,18 +96,27 @@ export async function login(input: LoginInput, meta: RequestMeta) {
   if (!passwordMatches) {
     const failedLoginAttempts = user.failedLoginAttempts + 1;
     const shouldLock = failedLoginAttempts >= MAX_FAILED_ATTEMPTS;
+    const lockedUntil = shouldLock ? new Date(Date.now() + LOCK_DURATION_MS) : null;
 
     await prisma.user.update({
       where: { id: user.id },
-      data: {
-        failedLoginAttempts: shouldLock ? 0 : failedLoginAttempts,
-        lockedUntil: shouldLock ? new Date(Date.now() + LOCK_DURATION_MS) : null,
-      },
+      data: { failedLoginAttempts: shouldLock ? 0 : failedLoginAttempts, lockedUntil },
     });
     await prisma.loginEvent.create({
-      data: { userId: user.id, email: user.email, result: "INVALID_CREDENTIALS", ip: meta.ip, userAgent: meta.userAgent },
+      data: {
+        userId: user.id,
+        email: user.email,
+        result: shouldLock ? "ACCOUNT_LOCKED" : "INVALID_CREDENTIALS",
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      },
     });
 
+    if (shouldLock) {
+      throw new HttpError(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos", {
+        lockedUntil: lockedUntil!.toISOString(),
+      });
+    }
     throw invalidCredentialsError();
   }
 
