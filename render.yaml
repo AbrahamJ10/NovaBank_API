@@ -3,7 +3,7 @@ services:
     name: novabank-api
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build && npx prisma migrate deploy
+    buildCommand: npm install --include=dev && npm run build && npx prisma migrate deploy
     startCommand: npm start
     envVars:
       - key: NODE_ENV

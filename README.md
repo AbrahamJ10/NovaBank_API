@@ -53,7 +53,10 @@ móvil, no aquí.
 2. En Render: **New > Web Service**, conecta el repo.
 3. Render puede leer `render.yaml` automáticamente (Blueprint), o configura a
    mano:
-   - **Build command**: `npm install && npm run build && npx prisma migrate deploy`
+   - **Build command**: `npm install --include=dev && npm run build && npx prisma migrate deploy`
+     (el `--include=dev` es necesario porque `NODE_ENV=production` hace que
+     `npm install` omita las devDependencies, donde viven `typescript`,
+     `prisma` y los `@types/*` que el build necesita)
    - **Start command**: `npm start`
    - **Variables de entorno**: `DATABASE_URL` (tu connection string de Neon),
      `CORS_ORIGIN`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` (puedes dejar que
