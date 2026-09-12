@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { env } from "../config/env";
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public details?: Record<string, unknown>) {
     super(message);
   }
 }
@@ -21,7 +21,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message });
+    res.status(err.status).json({ error: err.message, ...(err.details ?? {}) });
     return;
   }
 
