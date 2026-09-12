@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  phone     String?  @unique
+  dni       String?  @unique
+  fullName  String
+  passwordHash String
+
+  isActive  Boolean  @default(true)
+
+  // Brute-force / account lockout
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  refreshTokens RefreshToken[]
+  loginEvents   LoginEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Never store the raw token, only a hash of it
+  tokenHash  String    @unique
+
+  userAgent  String?
+  ip         String?
+
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedByTokenHash String?
+
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+enum LoginEventResult {
+  SUCCESS
+  INVALID_CREDENTIALS
+  ACCOUNT_LOCKED
+  ACCOUNT_INACTIVE
+}
+
+model LoginEvent {
+  id        String            @id @default(uuid())
+  userId    String?
+  user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String
+  result    LoginEventResult
+  ip        String?
+  userAgent String?
+  createdAt DateTime          @default(now())
+
+  @@index([userId])
+  @@index([email])
+  @@map("login_events")
+}
