@@ -4,6 +4,7 @@ import { generalLimiter } from "./middleware/rateLimit";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { healthRouter } from "./modules/health/health.routes";
 import { authRouter } from "./modules/auth/auth.routes";
+import { dniRouter } from "./modules/dni/dni.routes";
 
 export function createApp() {
   const app = express();
@@ -14,6 +15,7 @@ export function createApp() {
 
   app.use(healthRouter);
   app.use("/api/auth", authRouter);
+  app.use("/api/dni", dniRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
