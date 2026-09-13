@@ -11,6 +11,7 @@ export const registerSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(6).max(20).optional(),
   dni: z.string().trim().min(6).max(15).optional(),
+  otpCode: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos"),
 });
 
 export const loginSchema = z.object({

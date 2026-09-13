@@ -5,17 +5,21 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { healthRouter } from "./modules/health/health.routes";
 import { authRouter } from "./modules/auth/auth.routes";
 import { dniRouter } from "./modules/dni/dni.routes";
+import { verificationRouter } from "./modules/verification/verification.routes";
 
 export function createApp() {
   const app = express();
 
   applySecurityMiddleware(app);
-  app.use(express.json({ limit: "100kb" }));
+  // 8mb covers a selfie + DNI photo pair as base64 for face verification;
+  // every route that accepts a body this large is separately rate-limited.
+  app.use(express.json({ limit: "8mb" }));
   app.use(generalLimiter);
 
   app.use(healthRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/dni", dniRouter);
+  app.use("/api/verification", verificationRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
