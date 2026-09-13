@@ -72,3 +72,39 @@ model LoginEvent {
   @@index([email])
   @@map("login_events")
 }
+
+enum OtpPurpose {
+  REGISTER
+}
+
+model EmailOtp {
+  id         String     @id @default(uuid())
+  email      String
+  purpose    OtpPurpose
+
+  // Never store the raw code, only a hash of it
+  codeHash   String
+  attempts   Int        @default(0)
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([email, purpose])
+  @@map("email_otps")
+}
+
+// Audit trail only — the selfie/DNI photos themselves are never persisted,
+// they're compared in-memory against Face++ and discarded immediately.
+model FaceVerificationEvent {
+  id         String   @id @default(uuid())
+  dni        String
+  matched    Boolean
+  confidence Float
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([dni])
+  @@map("face_verification_events")
+}

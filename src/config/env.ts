@@ -11,6 +11,11 @@ const envSchema = z.object({
   JWT_ACCESS_TTL: z.string().default("15m"),
   JWT_REFRESH_TTL: z.string().default("30d"),
   DNI_PROVIDER_TOKEN: z.string().optional(),
+  FACEPP_API_KEY: z.string().optional(),
+  FACEPP_API_SECRET: z.string().optional(),
+  FACEPP_API_BASE: z.string().default("https://api-us.faceplusplus.com"),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM: z.string().default("NovaBank <onboarding@resend.dev>"),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -8,6 +8,7 @@ import {
   signAccessToken,
 } from "../../lib/jwt";
 import type { LoginInput, RegisterInput } from "./auth.validators";
+import { verifyRegisterOtp } from "../verification/otp.service";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
@@ -44,6 +45,8 @@ export async function register(input: RegisterInput, meta: RequestMeta) {
   if (existing) {
     throw new HttpError(409, "Ya existe una cuenta con ese correo");
   }
+
+  await verifyRegisterOtp(input.email, input.otpCode);
 
   const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
 
