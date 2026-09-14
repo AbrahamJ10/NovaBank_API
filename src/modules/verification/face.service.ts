@@ -45,7 +45,5 @@ export async function compareFaces(selfieBase64: string, dniPhotoBase64: string)
   const thresholds = data.thresholds as Record<string, number> | undefined;
   const threshold = thresholds?.["1e-4"] ?? 75;
 
-  console.log("[faceMatch] confidence:", data.confidence, "thresholds:", thresholds);
-
   return { matched: data.confidence >= threshold, confidence: data.confidence, threshold };
 }
