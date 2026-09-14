@@ -18,6 +18,9 @@ const envSchema = z.object({
   RESEND_FROM: z.string().default("NovaBank <onboarding@resend.dev>"),
   BREVO_API_KEY: z.string().optional(),
   BREVO_FROM_EMAIL: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

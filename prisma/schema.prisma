@@ -23,6 +23,7 @@ model User {
 
   refreshTokens RefreshToken[]
   loginEvents   LoginEvent[]
+  faceReference FaceReference?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -94,8 +95,25 @@ model EmailOtp {
   @@map("email_otps")
 }
 
-// Audit trail only — the selfie/DNI photos themselves are never persisted,
-// they're compared in-memory against Face++ and discarded immediately.
+// Reference photos for biometric Face ID login — captured once during
+// registration (with explicit user consent) and stored in Cloudinary; only
+// the resulting URLs live here. Every later Face ID login compares a fresh
+// selfie against these instead of being stored itself.
+model FaceReference {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dniPhotoUrl     String
+  selfiePhotoUrl  String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("face_references")
+}
+
+// Audit trail for the one-time registration face-match check — the photos
+// used there are compared in-memory against Face++ and discarded (unlike
+// FaceReference above, which is a deliberate saved copy for later logins).
 model FaceVerificationEvent {
   id         String   @id @default(uuid())
   dni        String
