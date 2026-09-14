@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { loginSchema, refreshSchema, registerSchema } from "./auth.validators";
+import { faceLoginSchema, loginSchema, refreshSchema, registerSchema } from "./auth.validators";
 import * as authService from "./auth.service";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
 import { prisma } from "../../lib/prisma";
@@ -17,6 +17,12 @@ export async function registerHandler(req: Request, res: Response) {
 export async function loginHandler(req: Request, res: Response) {
   const input = loginSchema.parse(req.body);
   const result = await authService.login(input, meta(req));
+  res.status(200).json(result);
+}
+
+export async function faceLoginHandler(req: Request, res: Response) {
+  const input = faceLoginSchema.parse(req.body);
+  const result = await authService.faceLogin(input, meta(req));
   res.status(200).json(result);
 }
 

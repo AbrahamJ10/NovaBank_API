@@ -50,7 +50,7 @@ verificationRouter.post(
   faceMatchLimiter,
   asyncHandler(async (req, res) => {
     const { dni, selfie, dniPhoto } = faceMatchSchema.parse(req.body);
-    const result = await compareFaces(selfie, dniPhoto);
+    const result = await compareFaces({ base64: selfie }, { base64: dniPhoto });
 
     await prisma.faceVerificationEvent.create({
       data: { dni, matched: result.matched, confidence: result.confidence, ip: req.ip, userAgent: req.headers["user-agent"] },

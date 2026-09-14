@@ -3,18 +3,27 @@ import { HttpError } from "../../middleware/errorHandler";
 
 export type FaceCompareResult = { matched: boolean; confidence: number; threshold: number };
 
+type ImageInput = { base64: string } | { url: string };
+
 function stripDataUriPrefix(base64: string) {
   const commaIndex = base64.indexOf(",");
   return base64.startsWith("data:") && commaIndex !== -1 ? base64.slice(commaIndex + 1) : base64;
 }
 
-// Compares a live selfie against the photo printed on the front of the DNI
-// using Face++ (facepp.com) — a generic face-comparison model, not an
-// official RENIEC biometric match (that access tier isn't sold to
-// individual developers). Confidence is checked against Face++'s own
-// "1e-4" false-accept-rate threshold, their recommended bar for
-// security-sensitive use cases.
-export async function compareFaces(selfieBase64: string, dniPhotoBase64: string): Promise<FaceCompareResult> {
+function setImageField(form: URLSearchParams, index: 1 | 2, image: ImageInput) {
+  if ("url" in image) {
+    form.set(`image_url${index}`, image.url);
+  } else {
+    form.set(`image_base64_${index}`, stripDataUriPrefix(image.base64));
+  }
+}
+
+// Compares two faces (each given as base64 or a hosted URL) using Face++
+// (facepp.com) — a generic face-comparison model, not an official RENIEC
+// biometric match (that access tier isn't sold to individual developers).
+// Confidence is checked against Face++'s own "1e-4" false-accept-rate
+// threshold, their recommended bar for security-sensitive use cases.
+export async function compareFaces(image1: ImageInput, image2: ImageInput): Promise<FaceCompareResult> {
   if (!env.FACEPP_API_KEY || !env.FACEPP_API_SECRET) {
     throw new HttpError(503, "El servicio de verificación facial no está configurado");
   }
@@ -22,8 +31,8 @@ export async function compareFaces(selfieBase64: string, dniPhotoBase64: string)
   const form = new URLSearchParams();
   form.set("api_key", env.FACEPP_API_KEY);
   form.set("api_secret", env.FACEPP_API_SECRET);
-  form.set("image_base64_1", stripDataUriPrefix(selfieBase64));
-  form.set("image_base64_2", stripDataUriPrefix(dniPhotoBase64));
+  setImageField(form, 1, image1);
+  setImageField(form, 2, image2);
 
   const res = await fetch(`${env.FACEPP_API_BASE}/facepp/v3/compare`, {
     method: "POST",
