@@ -16,6 +16,8 @@ const envSchema = z.object({
   FACEPP_API_BASE: z.string().default("https://api-us.faceplusplus.com"),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().default("NovaBank <onboarding@resend.dev>"),
+  GMAIL_USER: z.string().optional(),
+  GMAIL_APP_PASSWORD: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
