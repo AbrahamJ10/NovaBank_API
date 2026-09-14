@@ -1,7 +1,7 @@
 import { env } from "../../config/env";
 import { HttpError } from "../../middleware/errorHandler";
 
-export type FaceCompareResult = { matched: boolean; confidence: number };
+export type FaceCompareResult = { matched: boolean; confidence: number; threshold: number };
 
 function stripDataUriPrefix(base64: string) {
   const commaIndex = base64.indexOf(",");
@@ -45,5 +45,7 @@ export async function compareFaces(selfieBase64: string, dniPhotoBase64: string)
   const thresholds = data.thresholds as Record<string, number> | undefined;
   const threshold = thresholds?.["1e-4"] ?? 75;
 
-  return { matched: data.confidence >= threshold, confidence: data.confidence };
+  console.log("[faceMatch] confidence:", data.confidence, "thresholds:", thresholds);
+
+  return { matched: data.confidence >= threshold, confidence: data.confidence, threshold };
 }
