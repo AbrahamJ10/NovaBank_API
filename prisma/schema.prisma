@@ -9,47 +9,47 @@ datasource db {
 
 model User {
   id        String   @id @default(uuid())
-  email     String   @unique
-  phone     String?  @unique
+  email     String   @unique @map("correo")
+  phone     String?  @unique @map("telefono")
   dni       String?  @unique
-  fullName  String
-  passwordHash String
+  fullName  String   @map("nombre_completo")
+  passwordHash String @map("contrasena_hash")
 
-  isActive  Boolean  @default(true)
+  isActive  Boolean  @default(true) @map("esta_activo")
 
   // Brute-force / account lockout
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
+  failedLoginAttempts Int       @default(0) @map("intentos_fallidos")
+  lockedUntil         DateTime? @map("bloqueado_hasta")
 
   refreshTokens RefreshToken[]
   loginEvents   LoginEvent[]
   faceReference FaceReference?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("creado_en")
+  updatedAt DateTime @updatedAt @map("actualizado_en")
 
-  @@map("users")
+  @@map("usuarios")
 }
 
 model RefreshToken {
   id         String    @id @default(uuid())
-  userId     String
+  userId     String    @map("usuario_id")
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Never store the raw token, only a hash of it
-  tokenHash  String    @unique
+  tokenHash  String    @unique @map("token_hash")
 
-  userAgent  String?
+  userAgent  String?   @map("agente_usuario")
   ip         String?
 
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  replacedByTokenHash String?
+  expiresAt  DateTime  @map("expira_en")
+  revokedAt  DateTime? @map("revocado_en")
+  replacedByTokenHash String? @map("reemplazado_por_token_hash")
 
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime  @default(now()) @map("creado_en")
 
   @@index([userId])
-  @@map("refresh_tokens")
+  @@map("tokens_renovacion")
 }
 
 enum LoginEventResult {
@@ -57,42 +57,46 @@ enum LoginEventResult {
   INVALID_CREDENTIALS
   ACCOUNT_LOCKED
   ACCOUNT_INACTIVE
+
+  @@map("resultado_inicio_sesion")
 }
 
 model LoginEvent {
   id        String            @id @default(uuid())
-  userId    String?
+  userId    String?           @map("usuario_id")
   user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  email     String
-  result    LoginEventResult
+  email     String            @map("correo")
+  result    LoginEventResult  @map("resultado")
   ip        String?
-  userAgent String?
-  createdAt DateTime          @default(now())
+  userAgent String?           @map("agente_usuario")
+  createdAt DateTime          @default(now()) @map("creado_en")
 
   @@index([userId])
   @@index([email])
-  @@map("login_events")
+  @@map("eventos_inicio_sesion")
 }
 
 enum OtpPurpose {
   REGISTER
+
+  @@map("proposito_otp")
 }
 
 model EmailOtp {
   id         String     @id @default(uuid())
-  email      String
-  purpose    OtpPurpose
+  email      String     @map("correo")
+  purpose    OtpPurpose @map("proposito")
 
   // Never store the raw code, only a hash of it
-  codeHash   String
-  attempts   Int        @default(0)
+  codeHash   String     @map("codigo_hash")
+  attempts   Int        @default(0) @map("intentos")
 
-  expiresAt  DateTime
-  consumedAt DateTime?
-  createdAt  DateTime   @default(now())
+  expiresAt  DateTime   @map("expira_en")
+  consumedAt DateTime?  @map("consumido_en")
+  createdAt  DateTime   @default(now()) @map("creado_en")
 
   @@index([email, purpose])
-  @@map("email_otps")
+  @@map("codigos_verificacion")
 }
 
 // Reference photos for biometric Face ID login — captured once during
@@ -101,14 +105,14 @@ model EmailOtp {
 // selfie against these instead of being stored itself.
 model FaceReference {
   id              String   @id @default(uuid())
-  userId          String   @unique
+  userId          String   @unique @map("usuario_id")
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dniPhotoUrl     String
-  selfiePhotoUrl  String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  dniPhotoUrl     String   @map("foto_dni_url")
+  selfiePhotoUrl  String   @map("foto_selfie_url")
+  createdAt       DateTime @default(now()) @map("creado_en")
+  updatedAt       DateTime @updatedAt @map("actualizado_en")
 
-  @@map("face_references")
+  @@map("referencias_faciales")
 }
 
 // Audit trail for the one-time registration face-match check — the photos
@@ -117,12 +121,12 @@ model FaceReference {
 model FaceVerificationEvent {
   id         String   @id @default(uuid())
   dni        String
-  matched    Boolean
-  confidence Float
+  matched    Boolean  @map("coincidio")
+  confidence Float    @map("confianza")
   ip         String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
+  userAgent  String?  @map("agente_usuario")
+  createdAt  DateTime @default(now()) @map("creado_en")
 
   @@index([dni])
-  @@map("face_verification_events")
+  @@map("eventos_verificacion_facial")
 }
