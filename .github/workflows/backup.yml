@@ -6,6 +6,9 @@ on:
     - cron: '0 8 * * *'
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   backup:
     runs-on: ubuntu-latest
@@ -32,19 +35,31 @@ jobs:
           /usr/lib/postgresql/18/bin/pg_dump "$DATABASE_URL" | gzip > "$FILENAME"
           echo "FILENAME=$FILENAME" >> "$GITHUB_ENV"
 
-      # El AWS CLI (vía la capa de compatibilidad S3 de B2) dio dos errores
-      # distintos de firma/cuerpo de la petición por sus checksums nuevos.
-      # rclone habla el API nativo de B2 y evita todo eso de raíz.
-      - name: Instalar rclone
-        run: curl https://rclone.org/install.sh | sudo bash
-
-      - name: Subir el backup a Backblaze B2
+      # Guardamos el backup como un commit en una rama dedicada de este
+      # mismo repo — no requiere ninguna cuenta ni credencial nueva, solo
+      # el token que GitHub ya le da automáticamente a cada Action.
+      - name: Subir el backup a la rama "backups" de este repo
         env:
-          RCLONE_CONFIG_B2_TYPE: b2
-          RCLONE_CONFIG_B2_ACCOUNT: ${{ secrets.B2_KEY_ID }}
-          RCLONE_CONFIG_B2_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          rclone copy "$FILENAME" "b2:novabank-backups-abraham/" --progress
-          echo "--- Contenido del bucket después de subir ---"
-          rclone ls "b2:novabank-backups-abraham/"
+          SOURCE_FILE="$GITHUB_WORKSPACE/$FILENAME"
+
+          mkdir backups-checkout
+          cd backups-checkout
+          git init -q
+          git config user.name "novabank-backup-bot"
+          git config user.email "actions@github.com"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          if git fetch -q origin backups; then
+            git checkout -q backups
+          else
+            git checkout -q --orphan backups
+          fi
+
+          mkdir -p data
+          cp "$SOURCE_FILE" "data/$FILENAME"
+          git add "data/$FILENAME"
+          git commit -q -m "Backup $(date -u +%Y-%m-%d)"
+          git push -q origin backups
