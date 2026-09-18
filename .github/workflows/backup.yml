@@ -32,21 +32,19 @@ jobs:
           /usr/lib/postgresql/18/bin/pg_dump "$DATABASE_URL" | gzip > "$FILENAME"
           echo "FILENAME=$FILENAME" >> "$GITHUB_ENV"
 
+      # El AWS CLI (vía la capa de compatibilidad S3 de B2) dio dos errores
+      # distintos de firma/cuerpo de la petición por sus checksums nuevos.
+      # rclone habla el API nativo de B2 y evita todo eso de raíz.
+      - name: Instalar rclone
+        run: curl https://rclone.org/install.sh | sudo bash
+
       - name: Subir el backup a Backblaze B2
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.B2_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_APPLICATION_KEY }}
-          # AWS CLI 2.13+ agrega por defecto un checksum extra (CRC64NVME)
-          # al subir, y Backblaze B2 no lo soporta bien — rompe la firma de
-          # la petición ("Seed signature is invalid"). Esto lo desactiva.
-          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
-          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          RCLONE_CONFIG_B2_TYPE: b2
+          RCLONE_CONFIG_B2_ACCOUNT: ${{ secrets.B2_KEY_ID }}
+          RCLONE_CONFIG_B2_KEY: ${{ secrets.B2_APPLICATION_KEY }}
         run: |
           set -euo pipefail
-          aws s3 cp "$FILENAME" "s3://novabank-backups-abraham/$FILENAME" \
-            --endpoint-url https://s3.us-east-005.backblazeb2.com \
-            --region us-east-005
+          rclone copy "$FILENAME" "b2:novabank-backups-abraham/" --progress
           echo "--- Contenido del bucket después de subir ---"
-          aws s3 ls "s3://novabank-backups-abraham/" \
-            --endpoint-url https://s3.us-east-005.backblazeb2.com \
-            --region us-east-005
+          rclone ls "b2:novabank-backups-abraham/"
