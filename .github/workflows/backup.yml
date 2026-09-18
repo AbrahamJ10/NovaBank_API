@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           FILENAME="novabank-$(date -u +%Y-%m-%d).sql.gz"
-          pg_dump "$DATABASE_URL" | gzip > "$FILENAME"
+          /usr/lib/postgresql/18/bin/pg_dump "$DATABASE_URL" | gzip > "$FILENAME"
           echo "FILENAME=$FILENAME" >> "$GITHUB_ENV"
 
       - name: Subir el backup a Backblaze B2
