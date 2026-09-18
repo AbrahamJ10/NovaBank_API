@@ -1,0 +1,33 @@
+name: Backup diario de la base de datos
+
+on:
+  schedule:
+    # 08:00 UTC = 03:00 hora Perú (UTC-5), fuera de horas de uso
+    - cron: '0 8 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar cliente de PostgreSQL
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Generar dump comprimido de Neon
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          FILENAME="novabank-$(date -u +%Y-%m-%d).sql.gz"
+          pg_dump "$DATABASE_URL" | gzip > "$FILENAME"
+          echo "FILENAME=$FILENAME" >> "$GITHUB_ENV"
+
+      - name: Subir el backup a Backblaze B2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+        run: |
+          set -euo pipefail
+          aws s3 cp "$FILENAME" "s3://novabank-backups-abraham/$FILENAME" \
+            --endpoint-url https://s3.us-east-005.backblazeb2.com \
+            --region us-east-005
