@@ -5,7 +5,8 @@ import * as billsService from "./bills.service";
 import { affiliateSchema } from "./bills.validators";
 
 export async function getCatalogHandler(_req: Request, res: Response) {
-  res.json({ items: billsService.getCatalog() });
+  const items = await billsService.getCatalog();
+  res.json({ items });
 }
 
 export async function listBillsHandler(req: AuthenticatedRequest, res: Response) {

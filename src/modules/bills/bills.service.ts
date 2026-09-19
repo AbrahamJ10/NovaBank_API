@@ -5,39 +5,18 @@ import { recordTransaction } from "../transactions/transactions.service";
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
-export type BillerCategory = "luz" | "agua" | "gas" | "movil" | "cable";
+// The catalog itself lives in the "proveedores_servicio" table (see
+// prisma/seed.ts for the ~50 real Peruvian billers it's seeded with) —
+// this module only shapes it for the API and derives simulated bill state,
+// there's no real integration behind any one of them.
+export async function getCatalog() {
+  const billers = await prisma.biller.findMany({ where: { active: true }, orderBy: [{ category: "asc" }, { name: "asc" }] });
+  return billers.map((b) => ({ ...b, category: b.category.toLowerCase() }));
+}
 
-export type Biller = {
-  key: string;
-  name: string;
-  category: BillerCategory;
-  icon: string;
-  iconBg: string;
-  iconFg: string;
-  fieldLabel: string;
-  fieldPlaceholder: string;
-};
-
-// A fixed directory of real Peruvian billers — this is reference data (like
-// any bank's own biller catalog), not simulated transaction history. There's
-// no real integration behind each one, so looking one up (see
-// deriveBillState below) produces a plausible, deterministic bill rather
-// than a real fetch from Luz del Sur/Sedapal/etc.
-export const BILLER_CATALOG: Biller[] = [
-  { key: "luz-del-sur", name: "Luz del Sur", category: "luz", icon: "bolt", iconBg: "#FFF9EC", iconFg: "#B07D07", fieldLabel: "Número de suministro", fieldPlaceholder: "Ej. 0084 2210" },
-  { key: "enel", name: "Enel Distribución", category: "luz", icon: "bolt", iconBg: "#FFF9EC", iconFg: "#B07D07", fieldLabel: "Número de suministro", fieldPlaceholder: "Ej. 1123 5567" },
-  { key: "sedapal", name: "Sedapal", category: "agua", icon: "water-drop", iconBg: "#EAF3FF", iconFg: "#2C6FD1", fieldLabel: "Número de suministro", fieldPlaceholder: "Ej. 0021 8842" },
-  { key: "calidda", name: "Cálidda", category: "gas", icon: "local-gas-station", iconBg: "#FDEDE7", iconFg: "#B45B2E", fieldLabel: "Número de suministro", fieldPlaceholder: "Ej. 0456 1290" },
-  { key: "claro-movil", name: "Claro", category: "movil", icon: "wifi", iconBg: "#F4F6F9", iconFg: "#33414F", fieldLabel: "Número de línea", fieldPlaceholder: "Ej. 987 214 550" },
-  { key: "movistar-movil", name: "Movistar", category: "movil", icon: "wifi", iconBg: "#F4F6F9", iconFg: "#33414F", fieldLabel: "Número de línea", fieldPlaceholder: "Ej. 945 112 334" },
-  { key: "entel-movil", name: "Entel", category: "movil", icon: "wifi", iconBg: "#F4F6F9", iconFg: "#33414F", fieldLabel: "Número de línea", fieldPlaceholder: "Ej. 932 004 221" },
-  { key: "bitel-movil", name: "Bitel", category: "movil", icon: "wifi", iconBg: "#F4F6F9", iconFg: "#33414F", fieldLabel: "Número de línea", fieldPlaceholder: "Ej. 916 220 771" },
-  { key: "claro-tv", name: "Claro TV", category: "cable", icon: "live-tv", iconBg: "#FFF1E8", iconFg: "#D2691E", fieldLabel: "Código de cliente", fieldPlaceholder: "Ej. 55021847" },
-  { key: "movistar-tv", name: "Movistar TV", category: "cable", icon: "live-tv", iconBg: "#FFF1E8", iconFg: "#D2691E", fieldLabel: "Código de cliente", fieldPlaceholder: "Ej. 33087421" },
-];
-
-export function getCatalog() {
-  return BILLER_CATALOG;
+async function findBiller(key: string) {
+  const biller = await prisma.biller.findUnique({ where: { key, active: true } });
+  return biller;
 }
 
 const STARTER_AFFILIATIONS = [
@@ -72,7 +51,7 @@ function toPublicBill<T extends { amount: Prisma.Decimal }>(bill: T): Omit<T, "a
   return { ...bill, amount: Number(bill.amount) };
 }
 
-async function createAffiliation(db: Db, userId: string, biller: Biller, supplyNumber: string) {
+async function createAffiliation(db: Db, userId: string, biller: { key: string; name: string; icon: string; fieldLabel: string }, supplyNumber: string) {
   const { upToDate, amount, dueInDays } = deriveBillState(biller.key, supplyNumber);
   const dueDate = new Date(Date.now() + dueInDays * 24 * 60 * 60 * 1000);
   return db.bill.create({
@@ -96,13 +75,14 @@ async function createAffiliation(db: Db, userId: string, biller: Biller, supplyN
 // for transfers.
 export async function seedDefaultBills(db: Db, userId: string) {
   for (const s of STARTER_AFFILIATIONS) {
-    const biller = BILLER_CATALOG.find((b) => b.key === s.billerKey)!;
+    const biller = await findBiller(s.billerKey);
+    if (!biller) continue; // catalog not seeded yet in this environment — skip rather than fail registration
     await createAffiliation(db, userId, biller, s.supplyNumber);
   }
 }
 
 export async function affiliateBill(userId: string, billerKey: string, supplyNumberRaw: string) {
-  const biller = BILLER_CATALOG.find((b) => b.key === billerKey);
+  const biller = await findBiller(billerKey);
   if (!biller) throw new HttpError(404, "Servicio no encontrado en el catálogo");
 
   const supplyNumber = supplyNumberRaw.trim();
