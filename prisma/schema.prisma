@@ -24,6 +24,7 @@ model User {
   refreshTokens RefreshToken[]
   loginEvents   LoginEvent[]
   faceReference FaceReference?
+  account       Account?
 
   createdAt DateTime @default(now()) @map("creado_en")
   updatedAt DateTime @updatedAt @map("actualizado_en")
@@ -130,4 +131,72 @@ model FaceVerificationEvent {
 
   @@index([dni])
   @@map("eventos_verificacion_facial")
+}
+
+// The real internal ledger backing the Home screen — balances and account
+// numbers live here, generated once at registration. This never moves real
+// money through any bank; it's a self-contained ledger inside NovaBank
+// itself (see conversation: real interbank transfers require an SBS
+// license, which is out of reach for a personal project).
+model Account {
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("usuario_id")
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accountNumber    String   @unique @map("numero_cuenta")
+  cci              String   @unique
+  cardNumber       String   @map("numero_tarjeta")
+  cardExpiry       String   @map("vencimiento_tarjeta")
+
+  availableBalance Decimal  @default(0) @db.Decimal(12, 2) @map("saldo_disponible")
+  heldBalance      Decimal  @default(0) @db.Decimal(12, 2) @map("saldo_retenido")
+  creditLine       Decimal  @default(0) @db.Decimal(12, 2) @map("linea_credito")
+  cardDebt         Decimal  @default(0) @db.Decimal(12, 2) @map("deuda_tarjeta")
+  cutDay           Int      @default(28) @map("dia_corte")
+  cardBlocked      Boolean  @default(false) @map("tarjeta_bloqueada")
+
+  transactions     Transaction[]
+
+  createdAt DateTime @default(now()) @map("creado_en")
+  updatedAt DateTime @updatedAt @map("actualizado_en")
+
+  @@map("cuentas")
+}
+
+enum TransactionKind {
+  CREDIT
+  DEBIT
+
+  @@map("tipo_transaccion")
+}
+
+enum TransactionCategory {
+  COMPRAS
+  TRANSFERENCIAS
+  QR
+  INGRESOS
+  RETIROS
+  SERVICIOS
+
+  @@map("categoria_transaccion")
+}
+
+model Transaction {
+  id        String              @id @default(uuid())
+  accountId String              @map("cuenta_id")
+  account   Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  kind      TransactionKind     @map("tipo")
+  category  TransactionCategory @map("categoria")
+  name      String              @map("nombre")
+  meta      String
+  amount    Decimal             @db.Decimal(12, 2) @map("monto")
+  icon      String
+  iconBg    String              @map("icono_fondo")
+  iconFg    String              @map("icono_color")
+
+  createdAt DateTime            @default(now()) @map("creado_en")
+
+  @@index([accountId, createdAt])
+  @@map("transacciones")
 }

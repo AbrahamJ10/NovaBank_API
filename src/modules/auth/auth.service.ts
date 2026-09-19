@@ -15,6 +15,7 @@ import type {
   RegisterInput,
 } from "./auth.validators";
 import { requestPasswordResetOtp, verifyPasswordResetOtp, verifyRegisterOtp } from "../verification/otp.service";
+import { createAccountForUser } from "../account/account.service";
 import { compareFaces } from "../verification/face.service";
 import { uploadFaceReference } from "../../lib/cloudinary";
 
@@ -58,14 +59,21 @@ export async function register(input: RegisterInput, meta: RequestMeta) {
 
   const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
 
-  const user = await prisma.user.create({
-    data: {
-      email: input.email,
-      passwordHash,
-      fullName: input.fullName,
-      phone: input.phone,
-      dni: input.dni,
-    },
+  // The account (balance/card/transactions ledger) is core to the app
+  // working at all, so it's created atomically with the user — if either
+  // fails, both roll back rather than leaving an account-less user behind.
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: {
+        email: input.email,
+        passwordHash,
+        fullName: input.fullName,
+        phone: input.phone,
+        dni: input.dni,
+      },
+    });
+    await createAccountForUser(tx, created.id);
+    return created;
   });
 
   // Best-effort: a face reference isn't required to have an account, only

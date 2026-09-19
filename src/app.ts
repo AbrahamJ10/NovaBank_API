@@ -6,6 +6,8 @@ import { healthRouter } from "./modules/health/health.routes";
 import { authRouter } from "./modules/auth/auth.routes";
 import { dniRouter } from "./modules/dni/dni.routes";
 import { verificationRouter } from "./modules/verification/verification.routes";
+import { accountRouter } from "./modules/account/account.routes";
+import { transactionsRouter } from "./modules/transactions/transactions.routes";
 
 export function createApp() {
   const app = express();
@@ -20,6 +22,8 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/dni", dniRouter);
   app.use("/api/verification", verificationRouter);
+  app.use("/api/account", accountRouter);
+  app.use("/api/transactions", transactionsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
