@@ -267,6 +267,40 @@ model Payee {
   @@map("beneficiarios")
 }
 
+enum BillerCategory {
+  LUZ
+  AGUA
+  GAS
+  MOVIL
+  CABLE
+  BANCO
+  SEGURO
+  EDUCACION
+  MUNICIPALIDAD
+
+  @@map("categoria_proveedor")
+}
+
+// The real directory of billers a user can affiliate a service with (see
+// Bill below) — a global reference table, not per-user data, seeded once
+// via prisma/seed.ts.
+model Biller {
+  id               String         @id @default(uuid())
+  key              String         @unique
+  name             String
+  category         BillerCategory
+  icon             String
+  iconBg           String         @map("icono_fondo")
+  iconFg           String         @map("icono_color")
+  fieldLabel       String         @map("etiqueta_campo")
+  fieldPlaceholder String         @map("placeholder_campo")
+  active           Boolean        @default(true)
+
+  createdAt        DateTime       @default(now()) @map("creado_en")
+
+  @@map("proveedores_servicio")
+}
+
 // One row = one affiliated service (biller + supply/line number) AND its
 // current billing cycle. Paying it just flips paid=true — the next cycle
 // isn't a new row; listBills() lazily rolls a stale paid row back to
