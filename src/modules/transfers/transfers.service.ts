@@ -48,6 +48,22 @@ export async function executeTransfer(userId: string, email: string, input: Exec
     throw new HttpError(400, "Saldo insuficiente");
   }
 
+  // Rolling 24h window rather than a calendar day — avoids timezone edge
+  // cases around midnight while still meaning "daily limit" in practice.
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const sentRecently = await prisma.transaction.aggregate({
+    where: { accountId: account.id, category: "TRANSFERENCIAS", kind: "DEBIT", createdAt: { gte: since } },
+    _sum: { amount: true },
+  });
+  const alreadySent = Number(sentRecently._sum.amount ?? 0);
+  const limitOnline = Number(account.limitOnline);
+  if (alreadySent + input.amount > limitOnline) {
+    throw new HttpError(422, "Superaste tu límite de transferencias en línea", {
+      reasonCode: "R-LIMIT",
+      reasonLabel: `Límite diario de S/ ${limitOnline.toFixed(2)} superado`,
+    });
+  }
+
   const transaction = await prisma.$transaction(async (tx) => {
     await tx.account.update({
       where: { userId },

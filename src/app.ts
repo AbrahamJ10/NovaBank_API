@@ -12,6 +12,7 @@ import { notificationsRouter } from "./modules/notifications/notifications.route
 import { payeesRouter } from "./modules/payees/payees.routes";
 import { transfersRouter } from "./modules/transfers/transfers.routes";
 import { profileRouter } from "./modules/profile/profile.routes";
+import { securityRouter } from "./modules/security/security.routes";
 
 export function createApp() {
   const app = express();
@@ -32,6 +33,7 @@ export function createApp() {
   app.use("/api/payees", payeesRouter);
   app.use("/api/transfers", transfersRouter);
   app.use("/api/profile", profileRouter);
+  app.use("/api/security", securityRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
