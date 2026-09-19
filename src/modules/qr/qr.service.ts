@@ -1,0 +1,38 @@
+import { prisma } from "../../lib/prisma";
+import { HttpError } from "../../middleware/errorHandler";
+import { recordTransaction } from "../transactions/transactions.service";
+import type { PayQrInput } from "./qr.validators";
+
+export async function payQr(userId: string, input: PayQrInput) {
+  const account = await prisma.account.findUnique({ where: { userId } });
+  if (!account) throw new HttpError(404, "Cuenta no encontrada");
+  if (Number(account.availableBalance) < input.amount) throw new HttpError(400, "Saldo insuficiente");
+
+  const transaction = await prisma.$transaction(async (tx) => {
+    await tx.account.update({ where: { userId }, data: { availableBalance: { decrement: input.amount } } });
+    return recordTransaction(
+      tx,
+      userId,
+      account.id,
+      {
+        kind: "DEBIT",
+        category: "QR",
+        name: input.merchant,
+        meta: "Pago QR",
+        amount: input.amount,
+        icon: "qr-code-2",
+        iconBg: "#FFF1E8",
+        iconFg: "#D2691E",
+      },
+      {
+        title: "Pago con QR",
+        body: `Pagaste S/ ${input.amount.toFixed(2)} a ${input.merchant}.`,
+        icon: "qr-code-2",
+        iconBg: "#FFF1E8",
+        iconFg: "#D2691E",
+      }
+    );
+  });
+
+  return { transactionId: transaction.id, merchant: input.merchant, amount: input.amount, createdAt: transaction.createdAt };
+}

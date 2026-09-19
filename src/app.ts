@@ -14,6 +14,9 @@ import { transfersRouter } from "./modules/transfers/transfers.routes";
 import { profileRouter } from "./modules/profile/profile.routes";
 import { securityRouter } from "./modules/security/security.routes";
 import { statementsRouter } from "./modules/statements/statements.routes";
+import { billsRouter } from "./modules/bills/bills.routes";
+import { withdrawalsRouter } from "./modules/withdrawals/withdrawals.routes";
+import { qrRouter } from "./modules/qr/qr.routes";
 
 export function createApp() {
   const app = express();
@@ -36,6 +39,9 @@ export function createApp() {
   app.use("/api/profile", profileRouter);
   app.use("/api/security", securityRouter);
   app.use("/api/statements", statementsRouter);
+  app.use("/api/bills", billsRouter);
+  app.use("/api/withdrawals", withdrawalsRouter);
+  app.use("/api/qr", qrRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
