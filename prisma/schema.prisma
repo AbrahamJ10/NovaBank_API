@@ -25,6 +25,7 @@ model User {
   loginEvents   LoginEvent[]
   faceReference FaceReference?
   account       Account?
+  notifications Notification[]
 
   createdAt DateTime @default(now()) @map("creado_en")
   updatedAt DateTime @updatedAt @map("actualizado_en")
@@ -199,4 +200,26 @@ model Transaction {
 
   @@index([accountId, createdAt])
   @@map("transacciones")
+}
+
+// Real notifications tied to the account holder — created server-side
+// whenever something notification-worthy happens (a transaction lands,
+// a security event fires). Tied to the user rather than the account
+// since not every notification is transaction-shaped.
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("usuario_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String   @map("titulo")
+  body      String   @map("cuerpo")
+  icon      String
+  iconBg    String   @map("icono_fondo")
+  iconFg    String   @map("icono_color")
+  unread    Boolean  @default(true) @map("no_leido")
+
+  createdAt DateTime @default(now()) @map("creado_en")
+
+  @@index([userId, createdAt])
+  @@map("notificaciones")
 }
