@@ -83,6 +83,7 @@ enum OtpPurpose {
   REGISTER
   PASSWORD_RESET
   TRANSFER
+  PROFILE_UPDATE
 
   @@map("proposito_otp")
 }

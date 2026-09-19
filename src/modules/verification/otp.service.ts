@@ -19,6 +19,7 @@ const EMAIL_COPY: Record<OtpPurpose, { subject: string; heading: string }> = {
   REGISTER: { subject: "Tu código de verificación NovaBank", heading: "Verifica tu cuenta" },
   PASSWORD_RESET: { subject: "Recupera tu contraseña de NovaBank", heading: "Recuperar contraseña" },
   TRANSFER: { subject: "Código para confirmar tu transferencia", heading: "Confirmar transferencia" },
+  PROFILE_UPDATE: { subject: "Código para confirmar tu cambio de datos", heading: "Confirmar cambio de datos" },
 };
 
 async function requestOtp(email: string, purpose: OtpPurpose): Promise<void> {
@@ -96,4 +97,12 @@ export async function requestTransferOtp(email: string): Promise<void> {
 
 export async function verifyTransferOtp(email: string, code: string): Promise<void> {
   await verifyOtp(email, code, "TRANSFER");
+}
+
+export async function requestProfileOtp(email: string): Promise<void> {
+  await requestOtp(email, "PROFILE_UPDATE");
+}
+
+export async function verifyProfileOtp(email: string, code: string): Promise<void> {
+  await verifyOtp(email, code, "PROFILE_UPDATE");
 }
