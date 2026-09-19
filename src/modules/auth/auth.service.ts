@@ -19,6 +19,7 @@ import { createAccountForUser } from "../account/account.service";
 import { seedDefaultPayees } from "../payees/payees.service";
 import { compareFaces } from "../verification/face.service";
 import { uploadFaceReference } from "../../lib/cloudinary";
+import { createNotification } from "../notifications/notifications.service";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
@@ -154,6 +155,15 @@ async function registerSuccess(user: NonNullable<UserRecord>, meta: RequestMeta)
   await prisma.loginEvent.create({
     data: { userId: user.id, email: user.email, result: "SUCCESS", ip: meta.ip, userAgent: meta.userAgent },
   });
+  if (user.alertLogin) {
+    await createNotification(prisma, user.id, {
+      title: "Nuevo inicio de sesión",
+      body: meta.ip ? `Iniciaste sesión desde ${meta.ip}.` : "Iniciaste sesión con tu contraseña.",
+      icon: "login",
+      iconBg: "#EDF2F8",
+      iconFg: "#133A63",
+    });
+  }
 }
 
 export async function login(input: LoginInput, meta: RequestMeta) {

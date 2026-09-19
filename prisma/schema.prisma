@@ -21,6 +21,13 @@ model User {
   failedLoginAttempts Int       @default(0) @map("intentos_fallidos")
   lockedUntil         DateTime? @map("bloqueado_hasta")
 
+  // Notification preferences — which events actually create a Notification
+  // row for this user (see notifications.service.shouldNotify).
+  alertPurchase Boolean @default(true)  @map("alerta_compra")
+  alertWithdraw Boolean @default(true)  @map("alerta_retiro")
+  alertLogin    Boolean @default(true)  @map("alerta_login")
+  alertPromo    Boolean @default(false) @map("alerta_promo")
+
   refreshTokens RefreshToken[]
   loginEvents   LoginEvent[]
   faceReference FaceReference?
@@ -158,6 +165,15 @@ model Account {
   cardDebt         Decimal  @default(0) @db.Decimal(12, 2) @map("deuda_tarjeta")
   cutDay           Int      @default(28) @map("dia_corte")
   cardBlocked      Boolean  @default(false) @map("tarjeta_bloqueada")
+
+  // Spending limits/geo-controls. limitOnline is enforced on transfers (the
+  // one real money-out path); limitAtm/geo toggles are stored for the
+  // Limits screen but not enforced yet — cardless withdrawal isn't wired to
+  // the real ledger.
+  limitOnline      Decimal  @default(1500) @db.Decimal(12, 2) @map("limite_en_linea")
+  limitAtm         Decimal  @default(700)  @db.Decimal(12, 2) @map("limite_cajero")
+  geoPeru          Boolean  @default(true)  @map("geo_peru")
+  geoIntl          Boolean  @default(false) @map("geo_internacional")
 
   transactions     Transaction[]
 
