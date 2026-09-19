@@ -51,3 +51,14 @@ export const profileLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Demasiadas solicitudes, intenta de nuevo más tarde." },
 });
+
+// Generating a statement PDF is heavier than a typical request — kept
+// separate so a burst of statement requests can't also eat into someone's
+// password-reset attempts for the hour.
+export const statementLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes, intenta de nuevo más tarde." },
+});

@@ -13,6 +13,7 @@ import { payeesRouter } from "./modules/payees/payees.routes";
 import { transfersRouter } from "./modules/transfers/transfers.routes";
 import { profileRouter } from "./modules/profile/profile.routes";
 import { securityRouter } from "./modules/security/security.routes";
+import { statementsRouter } from "./modules/statements/statements.routes";
 
 export function createApp() {
   const app = express();
@@ -34,6 +35,7 @@ export function createApp() {
   app.use("/api/transfers", transfersRouter);
   app.use("/api/profile", profileRouter);
   app.use("/api/security", securityRouter);
+  app.use("/api/statements", statementsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
