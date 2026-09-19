@@ -6,7 +6,9 @@ import { HttpError } from "../../middleware/errorHandler";
 // or blocked on Render's free tier; this rides plain HTTPS instead. Only
 // a single verified sender email is required (no domain purchase) and,
 // once verified, it can send to any recipient.
-export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+export type EmailAttachment = { name: string; content: string }; // content is base64
+
+export async function sendEmail(to: string, subject: string, html: string, attachments?: EmailAttachment[]): Promise<void> {
   if (env.BREVO_API_KEY && env.BREVO_FROM_EMAIL) {
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -20,6 +22,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
         to: [{ email: to }],
         subject,
         htmlContent: html,
+        ...(attachments && attachments.length > 0 ? { attachment: attachments } : {}),
       }),
     });
 
@@ -34,7 +37,15 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: env.RESEND_FROM, to, subject, html }),
+      body: JSON.stringify({
+        from: env.RESEND_FROM,
+        to,
+        subject,
+        html,
+        ...(attachments && attachments.length > 0
+          ? { attachments: attachments.map((a) => ({ filename: a.name, content: a.content })) }
+          : {}),
+      }),
     });
     if (!res.ok) {
       console.error("Resend error:", res.status, await res.text().catch(() => ""));
