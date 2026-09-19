@@ -1,4 +1,47 @@
+import { Prisma, TransactionCategory, TransactionKind } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
+import { createNotification, NotificationInput } from "../notifications/notifications.service";
+
+type Db = typeof prisma | Prisma.TransactionClient;
+
+export type NewTransactionInput = {
+  kind: TransactionKind;
+  category: TransactionCategory;
+  name: string;
+  meta: string;
+  amount: number;
+  icon: string;
+  iconBg: string;
+  iconFg: string;
+};
+
+// The one place a transaction gets written — every future money-moving
+// endpoint (transfer, bill pay, QR, withdrawal) should call this so the
+// ledger row and its notification are always created together, atomically,
+// inside the same db/tx client as the balance update that caused it.
+export async function recordTransaction(
+  db: Db,
+  userId: string,
+  accountId: string,
+  input: NewTransactionInput,
+  notification: NotificationInput
+) {
+  const transaction = await db.transaction.create({
+    data: {
+      accountId,
+      kind: input.kind,
+      category: input.category,
+      name: input.name,
+      meta: input.meta,
+      amount: input.amount,
+      icon: input.icon,
+      iconBg: input.iconBg,
+      iconFg: input.iconFg,
+    },
+  });
+  await createNotification(db, userId, notification);
+  return transaction;
+}
 
 export async function listTransactions(userId: string, limit = 50) {
   const account = await prisma.account.findUnique({ where: { userId } });
