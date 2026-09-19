@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
+import { recordTransaction } from "../transactions/transactions.service";
 
 // A tiny starter line so a fresh account isn't stuck at zero everywhere —
 // this is an internal-ledger number only, not underwritten credit.
@@ -102,4 +103,45 @@ export async function setCardBlocked(userId: string, blocked: boolean) {
   if (!account) throw new HttpError(404, "Cuenta no encontrada");
   const updated = await prisma.account.update({ where: { userId }, data: { cardBlocked: blocked } });
   return updated.cardBlocked;
+}
+
+export async function payCard(userId: string, amount: number) {
+  const account = await prisma.account.findUnique({ where: { userId } });
+  if (!account) throw new HttpError(404, "Cuenta no encontrada");
+
+  if (amount <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
+  const cardDebt = Number(account.cardDebt);
+  if (amount > cardDebt) throw new HttpError(400, "El monto supera tu deuda actual");
+  if (Number(account.availableBalance) < amount) throw new HttpError(400, "Saldo insuficiente");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.account.update({
+      where: { userId },
+      data: { availableBalance: { decrement: amount }, cardDebt: { decrement: amount } },
+    });
+    await recordTransaction(
+      tx,
+      userId,
+      account.id,
+      {
+        kind: "DEBIT",
+        category: "PAGO_TARJETA",
+        name: "Pago de tarjeta",
+        meta: "Pago de deuda de tarjeta de crédito",
+        amount,
+        icon: "credit-card",
+        iconBg: "#EDF2F8",
+        iconFg: "#133A63",
+      },
+      {
+        title: "Pago de tarjeta realizado",
+        body: `Pagaste S/ ${amount.toFixed(2)} de tu tarjeta de crédito.`,
+        icon: "credit-card",
+        iconBg: "#EDF2F8",
+        iconFg: "#133A63",
+      }
+    );
+  });
+
+  return getAccountSummary(userId);
 }

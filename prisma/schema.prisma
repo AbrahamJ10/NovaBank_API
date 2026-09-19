@@ -34,6 +34,8 @@ model User {
   account       Account?
   notifications Notification[]
   payees        Payee[]
+  bills         Bill[]
+  withdrawals   Withdrawal[]
 
   createdAt DateTime @default(now()) @map("creado_en")
   updatedAt DateTime @updatedAt @map("actualizado_en")
@@ -176,6 +178,7 @@ model Account {
   geoIntl          Boolean  @default(false) @map("geo_internacional")
 
   transactions     Transaction[]
+  withdrawals      Withdrawal[]
 
   createdAt DateTime @default(now()) @map("creado_en")
   updatedAt DateTime @updatedAt @map("actualizado_en")
@@ -197,6 +200,7 @@ enum TransactionCategory {
   INGRESOS
   RETIROS
   SERVICIOS
+  PAGO_TARJETA
 
   @@map("categoria_transaccion")
 }
@@ -261,4 +265,49 @@ model Payee {
 
   @@index([userId])
   @@map("beneficiarios")
+}
+
+// A recurring service bill (utility, telecom, etc). Paying one debits the
+// account and marks it paid; a new row for the next cycle is created at
+// that point, same as a real recurring-billing relationship would renew.
+model Bill {
+  id          String   @id @default(uuid())
+  userId      String   @map("usuario_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  meta        String
+  icon        String
+  amount      Decimal  @db.Decimal(12, 2)
+  dueDate     DateTime @map("fecha_vencimiento")
+  consumption String?
+  paid        Boolean  @default(false) @map("pagado")
+  paidAt      DateTime? @map("pagado_en")
+
+  createdAt   DateTime @default(now()) @map("creado_en")
+
+  @@index([userId, paid])
+  @@map("servicios")
+}
+
+// A cardless-withdrawal code. The amount is debited immediately when the
+// code is generated (there's no real ATM network here to redeem against
+// later) — cancelling before it expires refunds it with a real credit
+// transaction, same as reversing any other real debit.
+model Withdrawal {
+  id         String    @id @default(uuid())
+  userId     String    @map("usuario_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId  String    @map("cuenta_id")
+  account    Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  code       String    @unique
+  amount     Decimal   @db.Decimal(12, 2)
+  expiresAt  DateTime  @map("expira_en")
+  cancelledAt DateTime? @map("cancelado_en")
+
+  createdAt  DateTime  @default(now()) @map("creado_en")
+
+  @@index([userId])
+  @@map("retiros_sin_tarjeta")
 }

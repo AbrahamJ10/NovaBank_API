@@ -15,3 +15,11 @@ export async function setCardBlockedHandler(req: AuthenticatedRequest, res: Resp
   const cardBlocked = await accountService.setCardBlocked(req.user!.id, blocked);
   res.json({ cardBlocked });
 }
+
+const payCardSchema = z.object({ amount: z.number().positive() });
+
+export async function payCardHandler(req: AuthenticatedRequest, res: Response) {
+  const { amount } = payCardSchema.parse(req.body);
+  const summary = await accountService.payCard(req.user!.id, amount);
+  res.json(summary);
+}
