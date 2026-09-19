@@ -22,3 +22,8 @@ export async function markReadHandler(req: AuthenticatedRequest, res: Response) 
   await notificationsService.markRead(req.user!.id, id);
   res.status(204).send();
 }
+
+export async function deleteAllHandler(req: AuthenticatedRequest, res: Response) {
+  await notificationsService.deleteAll(req.user!.id);
+  res.status(204).send();
+}
