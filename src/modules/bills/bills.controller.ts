@@ -1,11 +1,22 @@
-import { Response } from "express";
+import { Response, Request } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
 import * as billsService from "./bills.service";
+import { affiliateSchema } from "./bills.validators";
+
+export async function getCatalogHandler(_req: Request, res: Response) {
+  res.json({ items: billsService.getCatalog() });
+}
 
 export async function listBillsHandler(req: AuthenticatedRequest, res: Response) {
   const items = await billsService.listBills(req.user!.id);
   res.json({ items });
+}
+
+export async function affiliateHandler(req: AuthenticatedRequest, res: Response) {
+  const input = affiliateSchema.parse(req.body);
+  const bill = await billsService.affiliateBill(req.user!.id, input.billerKey, input.supplyNumber);
+  res.status(201).json(bill);
 }
 
 const paramsSchema = z.object({ id: z.string().uuid() });

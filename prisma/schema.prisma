@@ -267,13 +267,18 @@ model Payee {
   @@map("beneficiarios")
 }
 
-// A recurring service bill (utility, telecom, etc). Paying one debits the
-// account and marks it paid; a new row for the next cycle is created at
-// that point, same as a real recurring-billing relationship would renew.
+// One row = one affiliated service (biller + supply/line number) AND its
+// current billing cycle. Paying it just flips paid=true — the next cycle
+// isn't a new row; listBills() lazily rolls a stale paid row back to
+// paid=false once its cycle's elapsed, same effect as a real recurring
+// bill without needing a cron job.
 model Bill {
-  id          String   @id @default(uuid())
-  userId      String   @map("usuario_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid())
+  userId       String   @map("usuario_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  billerKey    String   @map("proveedor")
+  supplyNumber String   @map("numero_suministro")
 
   name        String
   meta        String
@@ -286,6 +291,7 @@ model Bill {
 
   createdAt   DateTime @default(now()) @map("creado_en")
 
+  @@unique([userId, billerKey, supplyNumber])
   @@index([userId, paid])
   @@map("servicios")
 }
