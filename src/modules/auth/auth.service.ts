@@ -16,6 +16,7 @@ import type {
 } from "./auth.validators";
 import { requestPasswordResetOtp, verifyPasswordResetOtp, verifyRegisterOtp } from "../verification/otp.service";
 import { createAccountForUser } from "../account/account.service";
+import { seedDefaultPayees } from "../payees/payees.service";
 import { compareFaces } from "../verification/face.service";
 import { uploadFaceReference } from "../../lib/cloudinary";
 
@@ -73,6 +74,7 @@ export async function register(input: RegisterInput, meta: RequestMeta) {
       },
     });
     await createAccountForUser(tx, created.id);
+    await seedDefaultPayees(tx, created.id);
     return created;
   });
 

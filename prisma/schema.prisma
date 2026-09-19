@@ -26,6 +26,7 @@ model User {
   faceReference FaceReference?
   account       Account?
   notifications Notification[]
+  payees        Payee[]
 
   createdAt DateTime @default(now()) @map("creado_en")
   updatedAt DateTime @updatedAt @map("actualizado_en")
@@ -81,6 +82,7 @@ model LoginEvent {
 enum OtpPurpose {
   REGISTER
   PASSWORD_RESET
+  TRANSFER
 
   @@map("proposito_otp")
 }
@@ -222,4 +224,24 @@ model Notification {
 
   @@index([userId, createdAt])
   @@map("notificaciones")
+}
+
+// A saved transfer beneficiary. "inactive" mirrors a real bank's own
+// rejection reasons (closed/frozen destination account) — the transfer
+// endpoint refuses to move money to one instead of silently succeeding.
+model Payee {
+  id            String   @id @default(uuid())
+  userId        String   @map("usuario_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name          String
+  bank          String
+  accountNumber String   @map("numero_cuenta")
+  initials      String
+  inactive      Boolean  @default(false)
+
+  createdAt     DateTime @default(now()) @map("creado_en")
+
+  @@index([userId])
+  @@map("beneficiarios")
 }
