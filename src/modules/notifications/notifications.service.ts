@@ -34,3 +34,7 @@ export async function markAllRead(userId: string) {
 export async function markRead(userId: string, id: string) {
   await prisma.notification.updateMany({ where: { id, userId }, data: { unread: false } });
 }
+
+export async function deleteAll(userId: string) {
+  await prisma.notification.deleteMany({ where: { userId } });
+}
