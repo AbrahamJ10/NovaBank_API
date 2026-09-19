@@ -11,6 +11,7 @@ import { transactionsRouter } from "./modules/transactions/transactions.routes";
 import { notificationsRouter } from "./modules/notifications/notifications.routes";
 import { payeesRouter } from "./modules/payees/payees.routes";
 import { transfersRouter } from "./modules/transfers/transfers.routes";
+import { profileRouter } from "./modules/profile/profile.routes";
 
 export function createApp() {
   const app = express();
@@ -30,6 +31,7 @@ export function createApp() {
   app.use("/api/notifications", notificationsRouter);
   app.use("/api/payees", payeesRouter);
   app.use("/api/transfers", transfersRouter);
+  app.use("/api/profile", profileRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

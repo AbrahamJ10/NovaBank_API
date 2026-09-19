@@ -40,3 +40,14 @@ export const transferLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Demasiadas solicitudes de transferencia, intenta de nuevo más tarde." },
 });
+
+// Guards the profile email/phone/password-change endpoints — tighter than
+// transferLimiter since these are sensitive account-takeover-adjacent
+// operations, not routine daily traffic.
+export const profileLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes, intenta de nuevo más tarde." },
+});
