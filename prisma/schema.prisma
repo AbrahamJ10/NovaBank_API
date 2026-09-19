@@ -78,6 +78,7 @@ model LoginEvent {
 
 enum OtpPurpose {
   REGISTER
+  PASSWORD_RESET
 
   @@map("proposito_otp")
 }

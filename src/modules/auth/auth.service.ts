@@ -7,8 +7,14 @@ import {
   refreshTtlToDate,
   signAccessToken,
 } from "../../lib/jwt";
-import type { FaceLoginInput, LoginInput, RegisterInput } from "./auth.validators";
-import { verifyRegisterOtp } from "../verification/otp.service";
+import type {
+  FaceLoginInput,
+  LoginInput,
+  PasswordResetConfirmInput,
+  PasswordResetRequestInput,
+  RegisterInput,
+} from "./auth.validators";
+import { requestPasswordResetOtp, verifyPasswordResetOtp, verifyRegisterOtp } from "../verification/otp.service";
 import { compareFaces } from "../verification/face.service";
 import { uploadFaceReference } from "../../lib/cloudinary";
 
@@ -242,6 +248,41 @@ export async function refresh(refreshToken: string, meta: RequestMeta) {
 
   const accessToken = signAccessToken({ sub: stored.user.id, email: stored.user.email });
   return { accessToken, refreshToken: newRefreshToken, user: toPublicUser(stored.user) };
+}
+
+export async function requestPasswordReset(input: PasswordResetRequestInput) {
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
+
+  // Same response whether or not the account exists, so this endpoint can't
+  // be used to check which emails are registered (user enumeration).
+  if (user && user.isActive) {
+    await requestPasswordResetOtp(input.email);
+  }
+}
+
+export async function confirmPasswordReset(input: PasswordResetConfirmInput) {
+  await verifyPasswordResetOtp(input.email, input.code);
+
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  if (!user) {
+    throw new HttpError(400, "No se pudo restablecer la contraseña, solicita un nuevo código");
+  }
+
+  const passwordHash = await bcrypt.hash(input.newPassword, PASSWORD_SALT_ROUNDS);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null },
+    }),
+    // A password reset is a strong signal any existing session may not be
+    // the account holder anymore — sign out every device, same as a stolen
+    // refresh token triggers in refresh() above.
+    prisma.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
 }
 
 export async function logout(refreshToken: string) {

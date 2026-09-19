@@ -19,3 +19,13 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Demasiados intentos. Intenta de nuevo en unos minutos." },
 });
+
+// Sends a real email, so this stays tight regardless of what authLimiter
+// allows — mirrors the registration OTP request limiter.
+export const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes, intenta de nuevo más tarde." },
+});
