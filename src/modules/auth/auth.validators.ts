@@ -33,6 +33,25 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(20),
 });
 
+const passwordSchema = z
+  .string()
+  .min(10, "La contraseña debe tener al menos 10 caracteres")
+  .regex(/[a-z]/, "Debe incluir una minúscula")
+  .regex(/[A-Z]/, "Debe incluir una mayúscula")
+  .regex(/[0-9]/, "Debe incluir un número");
+
+export const passwordResetRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+});
+
+export const passwordResetConfirmSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  code: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos"),
+  newPassword: passwordSchema,
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type FaceLoginInput = z.infer<typeof faceLoginSchema>;
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema>;
