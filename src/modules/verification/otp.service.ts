@@ -18,6 +18,7 @@ function generateCode() {
 const EMAIL_COPY: Record<OtpPurpose, { subject: string; heading: string }> = {
   REGISTER: { subject: "Tu código de verificación NovaBank", heading: "Verifica tu cuenta" },
   PASSWORD_RESET: { subject: "Recupera tu contraseña de NovaBank", heading: "Recuperar contraseña" },
+  TRANSFER: { subject: "Código para confirmar tu transferencia", heading: "Confirmar transferencia" },
 };
 
 async function requestOtp(email: string, purpose: OtpPurpose): Promise<void> {
@@ -87,4 +88,12 @@ export async function requestPasswordResetOtp(email: string): Promise<void> {
 
 export async function verifyPasswordResetOtp(email: string, code: string): Promise<void> {
   await verifyOtp(email, code, "PASSWORD_RESET");
+}
+
+export async function requestTransferOtp(email: string): Promise<void> {
+  await requestOtp(email, "TRANSFER");
+}
+
+export async function verifyTransferOtp(email: string, code: string): Promise<void> {
+  await verifyOtp(email, code, "TRANSFER");
 }

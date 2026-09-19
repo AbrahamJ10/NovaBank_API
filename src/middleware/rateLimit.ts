@@ -29,3 +29,14 @@ export const passwordResetLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Demasiadas solicitudes, intenta de nuevo más tarde." },
 });
+
+// Same shape as passwordResetLimiter — a separate export just so a burst
+// of password-reset attempts can't also eat into someone's transfer
+// attempts for the hour (and vice versa).
+export const transferLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes de transferencia, intenta de nuevo más tarde." },
+});
