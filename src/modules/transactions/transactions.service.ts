@@ -17,14 +17,18 @@ export type NewTransactionInput = {
 
 // The one place a transaction gets written — every future money-moving
 // endpoint (transfer, bill pay, QR, withdrawal) should call this so the
-// ledger row and its notification are always created together, atomically,
-// inside the same db/tx client as the balance update that caused it.
+// ledger row and its notification are created together, atomically, inside
+// the same db/tx client as the balance update that caused it. The ledger
+// row is never optional; `notification` is — callers whose category is
+// gated by a user notification preference (see User.alertPurchase/
+// alertWithdraw) pass null to skip it there instead of unconditionally
+// creating one, while the transaction itself still always records.
 export async function recordTransaction(
   db: Db,
   userId: string,
   accountId: string,
   input: NewTransactionInput,
-  notification: NotificationInput
+  notification: NotificationInput | null
 ) {
   const transaction = await db.transaction.create({
     data: {
@@ -39,7 +43,9 @@ export async function recordTransaction(
       iconFg: input.iconFg,
     },
   });
-  await createNotification(db, userId, notification);
+  if (notification) {
+    await createNotification(db, userId, notification);
+  }
   return transaction;
 }
 

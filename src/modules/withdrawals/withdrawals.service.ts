@@ -18,7 +18,10 @@ function toPublic(w: { id: string; code: string; amount: Prisma.Decimal; expires
 }
 
 export async function createWithdrawal(userId: string, amount: number, meta?: RequestMeta) {
-  const account = await prisma.account.findUnique({ where: { userId } });
+  const [account, user] = await Promise.all([
+    prisma.account.findUnique({ where: { userId } }),
+    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+  ]);
   if (!account) throw new HttpError(404, "Cuenta no encontrada");
   if (amount <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
   if (Number(account.availableBalance) < amount) throw new HttpError(400, "Saldo insuficiente");
@@ -61,13 +64,15 @@ export async function createWithdrawal(userId: string, amount: number, meta?: Re
         iconBg: "#F4F6F9",
         iconFg: "#33414F",
       },
-      {
-        title: "Retiro sin tarjeta generado",
-        body: `Generaste una clave para retirar S/ ${amount.toFixed(2)} sin tarjeta.`,
-        icon: "local-atm",
-        iconBg: "#F4F6F9",
-        iconFg: "#33414F",
-      }
+      user.alertWithdraw
+        ? {
+            title: "Retiro sin tarjeta generado",
+            body: `Generaste una clave para retirar S/ ${amount.toFixed(2)} sin tarjeta.`,
+            icon: "local-atm",
+            iconBg: "#F4F6F9",
+            iconFg: "#33414F",
+          }
+        : null
     );
 
     return created;
@@ -89,6 +94,7 @@ export async function cancelWithdrawal(userId: string, id: string, meta?: Reques
   if (!withdrawal) throw new HttpError(404, "Retiro no encontrado");
   if (withdrawal.cancelledAt) throw new HttpError(409, "Este retiro ya fue cancelado");
 
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const amount = Number(withdrawal.amount);
 
   await prisma.$transaction(async (tx) => {
@@ -108,13 +114,15 @@ export async function cancelWithdrawal(userId: string, id: string, meta?: Reques
         iconBg: "#EAF9F1",
         iconFg: "#21A26B",
       },
-      {
-        title: "Retiro cancelado",
-        body: `Cancelaste tu clave de retiro y te devolvimos S/ ${amount.toFixed(2)}.`,
-        icon: "local-atm",
-        iconBg: "#EAF9F1",
-        iconFg: "#21A26B",
-      }
+      user.alertWithdraw
+        ? {
+            title: "Retiro cancelado",
+            body: `Cancelaste tu clave de retiro y te devolvimos S/ ${amount.toFixed(2)}.`,
+            icon: "local-atm",
+            iconBg: "#EAF9F1",
+            iconFg: "#21A26B",
+          }
+        : null
     );
   });
 

@@ -21,8 +21,12 @@ model User {
   failedLoginAttempts Int       @default(0) @map("intentos_fallidos")
   lockedUntil         DateTime? @map("bloqueado_hasta")
 
-  // Notification preferences — which events actually create a Notification
-  // row for this user (see notifications.service.shouldNotify).
+  // Notification preferences — checked at each call site before creating a
+  // Notification row (alertPurchase in qr.service.payQr, alertWithdraw in
+  // withdrawals.service create/cancelWithdrawal, alertLogin in
+  // auth.service.registerSuccess); alertPromo has no promo feature yet to
+  // gate. The underlying Transaction/ledger row is never gated, only the
+  // notification.
   alertPurchase Boolean @default(true)  @map("alerta_compra")
   alertWithdraw Boolean @default(true)  @map("alerta_retiro")
   alertLogin    Boolean @default(true)  @map("alerta_login")
