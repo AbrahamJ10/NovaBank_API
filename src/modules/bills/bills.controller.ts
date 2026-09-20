@@ -27,3 +27,15 @@ export async function payBillHandler(req: AuthenticatedRequest, res: Response) {
   await billsService.payBill(req.user!.id, id);
   res.status(204).send();
 }
+
+export async function suspendBillHandler(req: AuthenticatedRequest, res: Response) {
+  const { id } = paramsSchema.parse(req.params);
+  const bill = await billsService.suspendBill(req.user!.id, id);
+  res.json(bill);
+}
+
+export async function resumeBillHandler(req: AuthenticatedRequest, res: Response) {
+  const { id } = paramsSchema.parse(req.params);
+  const bill = await billsService.resumeBill(req.user!.id, id);
+  res.json(bill);
+}

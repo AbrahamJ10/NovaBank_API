@@ -322,6 +322,7 @@ model Bill {
   consumption String?
   paid        Boolean  @default(false) @map("pagado")
   paidAt      DateTime? @map("pagado_en")
+  suspended   Boolean  @default(false) @map("suspendido")
 
   createdAt   DateTime @default(now()) @map("creado_en")
 

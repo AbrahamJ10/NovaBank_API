@@ -105,6 +105,7 @@ export async function listBills(userId: string) {
 
   const refreshed = await Promise.all(
     bills.map(async (b) => {
+      if (b.suspended) return b; // paused — stays exactly as-is until resumed
       if (b.paid && b.paidAt && now - b.paidAt.getTime() >= CYCLE_MS) {
         const { amount, dueInDays } = deriveBillState(b.billerKey, `${b.supplyNumber}:${b.paidAt.getTime()}`);
         return prisma.bill.update({
@@ -122,6 +123,7 @@ export async function listBills(userId: string) {
 export async function payBill(userId: string, billId: string) {
   const bill = await prisma.bill.findFirst({ where: { id: billId, userId } });
   if (!bill) throw new HttpError(404, "Servicio no encontrado");
+  if (bill.suspended) throw new HttpError(409, "Este servicio está suspendido, reactívalo para pagarlo");
   if (bill.paid) throw new HttpError(409, "Este servicio ya fue pagado");
 
   const account = await prisma.account.findUnique({ where: { userId } });
@@ -158,4 +160,18 @@ export async function payBill(userId: string, billId: string) {
       }
     );
   });
+}
+
+export async function suspendBill(userId: string, billId: string) {
+  const bill = await prisma.bill.findFirst({ where: { id: billId, userId } });
+  if (!bill) throw new HttpError(404, "Servicio no encontrado");
+  if (bill.suspended) throw new HttpError(409, "Este servicio ya está suspendido");
+  return toPublicBill(await prisma.bill.update({ where: { id: bill.id }, data: { suspended: true } }));
+}
+
+export async function resumeBill(userId: string, billId: string) {
+  const bill = await prisma.bill.findFirst({ where: { id: billId, userId } });
+  if (!bill) throw new HttpError(404, "Servicio no encontrado");
+  if (!bill.suspended) throw new HttpError(409, "Este servicio no está suspendido");
+  return toPublicBill(await prisma.bill.update({ where: { id: bill.id }, data: { suspended: false } }));
 }
