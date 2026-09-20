@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { recordTransaction } from "../transactions/transactions.service";
+import { recordAudit } from "../audit/audit.service";
+import type { RequestMeta } from "../../lib/requestMeta";
 
 const WITHDRAW_TTL_MS = 30 * 60 * 1000;
 
@@ -15,7 +17,7 @@ function toPublic(w: { id: string; code: string; amount: Prisma.Decimal; expires
   return { id: w.id, code: w.code, amount: Number(w.amount), expiresAt: w.expiresAt };
 }
 
-export async function createWithdrawal(userId: string, amount: number) {
+export async function createWithdrawal(userId: string, amount: number, meta?: RequestMeta) {
   const account = await prisma.account.findUnique({ where: { userId } });
   if (!account) throw new HttpError(404, "Cuenta no encontrada");
   if (amount <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
@@ -71,10 +73,18 @@ export async function createWithdrawal(userId: string, amount: number) {
     return created;
   });
 
+  await recordAudit({
+    userId,
+    category: "RETIRO",
+    action: "withdrawal_created",
+    metadata: { withdrawalId: withdrawal.id, amount },
+    meta,
+  });
+
   return toPublic(withdrawal);
 }
 
-export async function cancelWithdrawal(userId: string, id: string) {
+export async function cancelWithdrawal(userId: string, id: string, meta?: RequestMeta) {
   const withdrawal = await prisma.withdrawal.findFirst({ where: { id, userId } });
   if (!withdrawal) throw new HttpError(404, "Retiro no encontrado");
   if (withdrawal.cancelledAt) throw new HttpError(409, "Este retiro ya fue cancelado");
@@ -107,9 +117,17 @@ export async function cancelWithdrawal(userId: string, id: string) {
       }
     );
   });
+
+  await recordAudit({
+    userId,
+    category: "RETIRO",
+    action: "withdrawal_cancelled",
+    metadata: { withdrawalId: withdrawal.id, amount },
+    meta,
+  });
 }
 
-export async function renewWithdrawal(userId: string, id: string) {
+export async function renewWithdrawal(userId: string, id: string, meta?: RequestMeta) {
   const withdrawal = await prisma.withdrawal.findFirst({ where: { id, userId } });
   if (!withdrawal) throw new HttpError(404, "Retiro no encontrado");
   if (withdrawal.cancelledAt) throw new HttpError(409, "Este retiro ya fue cancelado");
@@ -119,6 +137,13 @@ export async function renewWithdrawal(userId: string, id: string) {
       const updated = await prisma.withdrawal.update({
         where: { id: withdrawal.id },
         data: { code: generateCode(), expiresAt: new Date(Date.now() + WITHDRAW_TTL_MS) },
+      });
+      await recordAudit({
+        userId,
+        category: "RETIRO",
+        action: "withdrawal_renewed",
+        metadata: { withdrawalId: withdrawal.id, amount: Number(withdrawal.amount) },
+        meta,
       });
       return toPublic(updated);
     } catch (err) {

@@ -36,6 +36,7 @@ model User {
   payees        Payee[]
   bills         Bill[]
   withdrawals   Withdrawal[]
+  auditLogs     AuditLog[]
 
   createdAt DateTime @default(now()) @map("creado_en")
   updatedAt DateTime @updatedAt @map("actualizado_en")
@@ -333,6 +334,64 @@ model Bill {
   @@unique([userId, billerKey, supplyNumber])
   @@index([userId, paid, dueDate])
   @@map("servicios")
+}
+
+enum AuditCategory {
+  SESION
+  NAVEGACION
+  TRANSFERENCIA
+  PAGO_SERVICIO
+  RETIRO
+  TARJETA
+  QR
+  PERFIL
+  SEGURIDAD
+
+  @@map("categoria_auditoria")
+}
+
+// The full interaction trail: every security/money-moving action is written
+// here server-side (the service that performs it also calls
+// audit.service.recordAudit, see e.g. transfers.service.executeTransfer);
+// pure client-side navigation (screen views, button taps with no backend
+// call of their own) is reported in batches by the app itself through
+// POST /api/audit/events. Deliberately generic (action + metadata JSON)
+// instead of one column per event type, since the requested scope spans
+// everything from a button tap to a completed transfer — category narrows
+// it enough to query efficiently, metadata carries whatever's specific to
+// that action (target payee, amount, screen name, biller key, etc).
+//
+// country/city are best-effort from the request IP (see lib/geo.ts) — that
+// gives country/city-level location, not a precise Peruvian ubigeo
+// (department/province/district), which would need the app to request GPS
+// permission and isn't implemented.
+model AuditLog {
+  id          String        @id @default(uuid())
+  userId      String?       @map("usuario_id")
+  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  category    AuditCategory @map("categoria")
+  action      String        @map("accion")
+  success     Boolean       @default(true) @map("exitoso")
+
+  description String?       @map("descripcion")
+  metadata    Json?         @map("metadatos")
+
+  screen      String?       @map("pantalla")
+
+  ip          String?
+  country     String?       @map("pais")
+  city        String?       @map("ciudad")
+  device      String?       @map("dispositivo")
+  platform    String?       @map("plataforma")
+  appVersion  String?       @map("version_app")
+
+  createdAt   DateTime      @default(now()) @map("creado_en")
+
+  @@index([userId, createdAt])
+  @@index([category, createdAt])
+  @@index([action])
+  @@map("auditoria")
 }
 
 // A cardless-withdrawal code. The amount is debited immediately when the

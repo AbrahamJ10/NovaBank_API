@@ -52,6 +52,17 @@ export const profileLimiter = rateLimit({
   message: { error: "Demasiadas solicitudes, intenta de nuevo más tarde." },
 });
 
+// Client-reported navigation/button-tap telemetry is frequent by nature
+// (batched every few seconds while the app is open) — generous ceiling that
+// only exists to stop a runaway client from flooding the audit table.
+export const auditLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiados eventos, intenta de nuevo más tarde." },
+});
+
 // Generating a statement PDF is heavier than a typical request — kept
 // separate so a burst of statement requests can't also eat into someone's
 // password-reset attempts for the hour.

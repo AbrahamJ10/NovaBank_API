@@ -4,6 +4,8 @@ import { HttpError } from "../../middleware/errorHandler";
 import { recordTransaction } from "../transactions/transactions.service";
 import { verifyProfileOtp } from "../verification/otp.service";
 import { encrypt, decrypt } from "../../lib/crypto";
+import { recordAudit } from "../audit/audit.service";
+import type { RequestMeta } from "../../lib/requestMeta";
 
 // A tiny starter line so a fresh account isn't stuck at zero everywhere —
 // this is an internal-ledger number only, not underwritten credit.
@@ -108,7 +110,7 @@ export async function getAccountSummary(userId: string) {
 // Confirmed with the same email OTP used for profile changes (see
 // profile.service.ts) — the CVV is only ever readable after proving control
 // of the account's verified email, same bar as changing the password.
-export async function revealCvv(userId: string, otpCode: string) {
+export async function revealCvv(userId: string, otpCode: string, meta?: RequestMeta) {
   const [user, account] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),
     prisma.account.findUnique({ where: { userId } }),
@@ -117,24 +119,42 @@ export async function revealCvv(userId: string, otpCode: string) {
 
   await verifyProfileOtp(user.email, otpCode);
 
+  await recordAudit({ userId, category: "TARJETA", action: "cvv_revealed", meta });
+
   return { cvv: decrypt(account.cardCvv) };
 }
 
-export async function setCardBlocked(userId: string, blocked: boolean) {
+export async function setCardBlocked(userId: string, blocked: boolean, meta?: RequestMeta) {
   const account = await prisma.account.findUnique({ where: { userId } });
   if (!account) throw new HttpError(404, "Cuenta no encontrada");
   const updated = await prisma.account.update({ where: { userId }, data: { cardBlocked: blocked } });
+  await recordAudit({
+    userId,
+    category: "TARJETA",
+    action: blocked ? "card_blocked" : "card_unblocked",
+    meta,
+  });
   return updated.cardBlocked;
 }
 
-export async function payCard(userId: string, amount: number) {
+export async function payCard(userId: string, amount: number, meta?: RequestMeta) {
   const account = await prisma.account.findUnique({ where: { userId } });
   if (!account) throw new HttpError(404, "Cuenta no encontrada");
 
   if (amount <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
   const cardDebt = Number(account.cardDebt);
   if (amount > cardDebt) throw new HttpError(400, "El monto supera tu deuda actual");
-  if (Number(account.availableBalance) < amount) throw new HttpError(400, "Saldo insuficiente");
+  if (Number(account.availableBalance) < amount) {
+    await recordAudit({
+      userId,
+      category: "TARJETA",
+      action: "card_payment_failed_insufficient_balance",
+      success: false,
+      metadata: { amount },
+      meta,
+    });
+    throw new HttpError(400, "Saldo insuficiente");
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.account.update({
@@ -164,6 +184,8 @@ export async function payCard(userId: string, amount: number) {
       }
     );
   });
+
+  await recordAudit({ userId, category: "TARJETA", action: "card_payment_completed", metadata: { amount }, meta });
 
   return getAccountSummary(userId);
 }

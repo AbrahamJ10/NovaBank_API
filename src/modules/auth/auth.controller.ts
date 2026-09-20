@@ -10,10 +10,7 @@ import {
 import * as authService from "./auth.service";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
 import { prisma } from "../../lib/prisma";
-
-function meta(req: Request) {
-  return { ip: req.ip, userAgent: req.headers["user-agent"] };
-}
+import { getRequestMeta as meta } from "../../lib/requestMeta";
 
 export async function registerHandler(req: Request, res: Response) {
   const input = registerSchema.parse(req.body);
@@ -53,7 +50,7 @@ export async function refreshHandler(req: Request, res: Response) {
 
 export async function logoutHandler(req: Request, res: Response) {
   const { refreshToken } = refreshSchema.parse(req.body);
-  await authService.logout(refreshToken);
+  await authService.logout(refreshToken, meta(req));
   res.status(204).send();
 }
 

@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
 import * as transfersService from "./transfers.service";
+import { getRequestMeta } from "../../lib/requestMeta";
 
 export async function requestTransferOtpHandler(req: AuthenticatedRequest, res: Response) {
   await transfersService.requestTransfer(req.user!.email);
@@ -17,6 +18,6 @@ const executeSchema = z.object({
 
 export async function executeTransferHandler(req: AuthenticatedRequest, res: Response) {
   const input = executeSchema.parse(req.body);
-  const receipt = await transfersService.executeTransfer(req.user!.id, req.user!.email, input);
+  const receipt = await transfersService.executeTransfer(req.user!.id, req.user!.email, input, getRequestMeta(req));
   res.status(201).json(receipt);
 }

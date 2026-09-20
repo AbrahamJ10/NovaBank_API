@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { recordTransaction } from "../transactions/transactions.service";
+import { recordAudit } from "../audit/audit.service";
+import type { RequestMeta } from "../../lib/requestMeta";
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
@@ -81,7 +83,7 @@ export async function seedDefaultBills(db: Db, userId: string) {
   }
 }
 
-export async function affiliateBill(userId: string, billerKey: string, supplyNumberRaw: string) {
+export async function affiliateBill(userId: string, billerKey: string, supplyNumberRaw: string, meta?: RequestMeta) {
   const biller = await findBiller(billerKey);
   if (!biller) throw new HttpError(404, "Servicio no encontrado en el catálogo");
 
@@ -93,7 +95,15 @@ export async function affiliateBill(userId: string, billerKey: string, supplyNum
   });
   if (existing) return toPublicBill(existing); // already affiliated — re-lookup is idempotent
 
-  return toPublicBill(await createAffiliation(prisma, userId, biller, supplyNumber));
+  const created = await createAffiliation(prisma, userId, biller, supplyNumber);
+  await recordAudit({
+    userId,
+    category: "PAGO_SERVICIO",
+    action: "bill_affiliated",
+    metadata: { billId: created.id, billerKey, billerName: biller.name, supplyNumber },
+    meta,
+  });
+  return toPublicBill(created);
 }
 
 // Rolls any affiliated service whose last payment (or "up to date" lookup)
@@ -120,7 +130,7 @@ export async function listBills(userId: string) {
   return refreshed.map(toPublicBill);
 }
 
-export async function payBill(userId: string, billId: string) {
+export async function payBill(userId: string, billId: string, meta?: RequestMeta) {
   const bill = await prisma.bill.findFirst({ where: { id: billId, userId } });
   if (!bill) throw new HttpError(404, "Servicio no encontrado");
   if (bill.suspended) throw new HttpError(409, "Este servicio está suspendido, reactívalo para pagarlo");
@@ -131,6 +141,14 @@ export async function payBill(userId: string, billId: string) {
 
   const amount = Number(bill.amount);
   if (Number(account.availableBalance) < amount) {
+    await recordAudit({
+      userId,
+      category: "PAGO_SERVICIO",
+      action: "bill_payment_failed_insufficient_balance",
+      success: false,
+      metadata: { billId: bill.id, billerKey: bill.billerKey, billName: bill.name, amount },
+      meta,
+    });
     throw new HttpError(400, "Saldo insuficiente");
   }
 
@@ -160,18 +178,42 @@ export async function payBill(userId: string, billId: string) {
       }
     );
   });
+
+  await recordAudit({
+    userId,
+    category: "PAGO_SERVICIO",
+    action: "bill_paid",
+    metadata: { billId: bill.id, billerKey: bill.billerKey, billName: bill.name, amount },
+    meta,
+  });
 }
 
-export async function suspendBill(userId: string, billId: string) {
+export async function suspendBill(userId: string, billId: string, meta?: RequestMeta) {
   const bill = await prisma.bill.findFirst({ where: { id: billId, userId } });
   if (!bill) throw new HttpError(404, "Servicio no encontrado");
   if (bill.suspended) throw new HttpError(409, "Este servicio ya está suspendido");
-  return toPublicBill(await prisma.bill.update({ where: { id: bill.id }, data: { suspended: true } }));
+  const updated = await prisma.bill.update({ where: { id: bill.id }, data: { suspended: true } });
+  await recordAudit({
+    userId,
+    category: "PAGO_SERVICIO",
+    action: "bill_suspended",
+    metadata: { billId: bill.id, billerKey: bill.billerKey, billName: bill.name },
+    meta,
+  });
+  return toPublicBill(updated);
 }
 
-export async function resumeBill(userId: string, billId: string) {
+export async function resumeBill(userId: string, billId: string, meta?: RequestMeta) {
   const bill = await prisma.bill.findFirst({ where: { id: billId, userId } });
   if (!bill) throw new HttpError(404, "Servicio no encontrado");
   if (!bill.suspended) throw new HttpError(409, "Este servicio no está suspendido");
-  return toPublicBill(await prisma.bill.update({ where: { id: bill.id }, data: { suspended: false } }));
+  const updated = await prisma.bill.update({ where: { id: bill.id }, data: { suspended: false } });
+  await recordAudit({
+    userId,
+    category: "PAGO_SERVICIO",
+    action: "bill_resumed",
+    metadata: { billId: bill.id, billerKey: bill.billerKey, billName: bill.name },
+    meta,
+  });
+  return toPublicBill(updated);
 }

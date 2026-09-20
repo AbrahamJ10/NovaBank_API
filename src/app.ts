@@ -17,6 +17,7 @@ import { statementsRouter } from "./modules/statements/statements.routes";
 import { billsRouter } from "./modules/bills/bills.routes";
 import { withdrawalsRouter } from "./modules/withdrawals/withdrawals.routes";
 import { qrRouter } from "./modules/qr/qr.routes";
+import { auditRouter } from "./modules/audit/audit.routes";
 
 export function createApp() {
   const app = express();
@@ -42,6 +43,7 @@ export function createApp() {
   app.use("/api/bills", billsRouter);
   app.use("/api/withdrawals", withdrawalsRouter);
   app.use("/api/qr", qrRouter);
+  app.use("/api/audit", auditRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

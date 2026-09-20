@@ -21,15 +21,12 @@ import { seedDefaultBills } from "../bills/bills.service";
 import { compareFaces } from "../verification/face.service";
 import { uploadFaceReference } from "../../lib/cloudinary";
 import { createNotification } from "../notifications/notifications.service";
+import { recordAudit } from "../audit/audit.service";
+import type { RequestMeta } from "../../lib/requestMeta";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
 const PASSWORD_SALT_ROUNDS = 12;
-
-interface RequestMeta {
-  ip?: string;
-  userAgent?: string;
-}
 
 function toPublicUser(user: { id: string; email: string; fullName: string; phone: string | null; dni: string | null }) {
   return { id: user.id, email: user.email, fullName: user.fullName, phone: user.phone, dni: user.dni };
@@ -96,6 +93,7 @@ export async function register(input: RegisterInput, meta: RequestMeta) {
   }
 
   const tokens = await issueTokenPair(user.id, user.email, meta);
+  await recordAudit({ userId: user.id, category: "SESION", action: "register", meta });
   return { user: toPublicUser(user), ...tokens };
 }
 
@@ -109,6 +107,7 @@ async function assertLoginAllowed(user: NonNullable<UserRecord>, meta: RequestMe
     await prisma.loginEvent.create({
       data: { userId: user.id, email: user.email, result: "ACCOUNT_LOCKED", ip: meta.ip, userAgent: meta.userAgent },
     });
+    await recordAudit({ userId: user.id, category: "SESION", action: "login_blocked_locked", success: false, meta });
     throw new HttpError(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos", {
       lockedUntil: user.lockedUntil.toISOString(),
     });
@@ -118,6 +117,7 @@ async function assertLoginAllowed(user: NonNullable<UserRecord>, meta: RequestMe
     await prisma.loginEvent.create({
       data: { userId: user.id, email: user.email, result: "ACCOUNT_INACTIVE", ip: meta.ip, userAgent: meta.userAgent },
     });
+    await recordAudit({ userId: user.id, category: "SESION", action: "login_blocked_inactive", success: false, meta });
     throw new HttpError(403, "Cuenta inactiva");
   }
 }
@@ -140,6 +140,14 @@ async function registerFailedAttempt(user: NonNullable<UserRecord>, meta: Reques
       userAgent: meta.userAgent,
     },
   });
+  await recordAudit({
+    userId: user.id,
+    category: "SESION",
+    action: shouldLock ? "login_failed_now_locked" : "login_failed",
+    success: false,
+    metadata: { failedLoginAttempts },
+    meta,
+  });
 
   if (shouldLock) {
     throw new HttpError(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos", {
@@ -149,7 +157,7 @@ async function registerFailedAttempt(user: NonNullable<UserRecord>, meta: Reques
   throw invalidError();
 }
 
-async function registerSuccess(user: NonNullable<UserRecord>, meta: RequestMeta) {
+async function registerSuccess(user: NonNullable<UserRecord>, meta: RequestMeta, method: "password" | "face_id") {
   await prisma.user.update({
     where: { id: user.id },
     data: { failedLoginAttempts: 0, lockedUntil: null },
@@ -157,6 +165,7 @@ async function registerSuccess(user: NonNullable<UserRecord>, meta: RequestMeta)
   await prisma.loginEvent.create({
     data: { userId: user.id, email: user.email, result: "SUCCESS", ip: meta.ip, userAgent: meta.userAgent },
   });
+  await recordAudit({ userId: user.id, category: "SESION", action: "login_success", metadata: { method }, meta });
   if (user.alertLogin) {
     await createNotification(prisma, user.id, {
       title: "Nuevo inicio de sesión",
@@ -179,6 +188,13 @@ export async function login(input: LoginInput, meta: RequestMeta) {
     await prisma.loginEvent.create({
       data: { email: input.email, result: "INVALID_CREDENTIALS", ip: meta.ip, userAgent: meta.userAgent },
     });
+    await recordAudit({
+      category: "SESION",
+      action: "login_failed_unknown_email",
+      success: false,
+      description: input.email,
+      meta,
+    });
     throw invalidCredentialsError();
   }
 
@@ -189,7 +205,7 @@ export async function login(input: LoginInput, meta: RequestMeta) {
     await registerFailedAttempt(user, meta, invalidCredentialsError);
   }
 
-  await registerSuccess(user, meta);
+  await registerSuccess(user, meta, "password");
 
   const tokens = await issueTokenPair(user.id, user.email, meta);
   return { user: toPublicUser(user), ...tokens };
@@ -203,6 +219,14 @@ export async function faceLogin(input: FaceLoginInput, meta: RequestMeta) {
   if (!user) {
     await prisma.loginEvent.create({
       data: { email: input.email, result: "INVALID_CREDENTIALS", ip: meta.ip, userAgent: meta.userAgent },
+    });
+    await recordAudit({
+      category: "SESION",
+      action: "login_failed_unknown_email",
+      success: false,
+      description: input.email,
+      metadata: { method: "face_id" },
+      meta,
     });
     throw invalidError();
   }
@@ -227,7 +251,7 @@ export async function faceLogin(input: FaceLoginInput, meta: RequestMeta) {
     await registerFailedAttempt(user, meta, invalidError);
   }
 
-  await registerSuccess(user, meta);
+  await registerSuccess(user, meta, "face_id");
 
   const tokens = await issueTokenPair(user.id, user.email, meta);
   return { user: toPublicUser(user), ...tokens };
@@ -311,12 +335,20 @@ export async function confirmPasswordReset(input: PasswordResetConfirmInput) {
       data: { revokedAt: new Date() },
     }),
   ]);
+
+  await recordAudit({ userId: user.id, category: "SESION", action: "password_reset_confirmed" });
 }
 
-export async function logout(refreshToken: string) {
+export async function logout(refreshToken: string, meta: RequestMeta) {
   const tokenHash = hashToken(refreshToken);
+  const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
+
   await prisma.refreshToken.updateMany({
     where: { tokenHash, revokedAt: null },
     data: { revokedAt: new Date() },
   });
+
+  if (stored?.userId) {
+    await recordAudit({ userId: stored.userId, category: "SESION", action: "logout", meta });
+  }
 }

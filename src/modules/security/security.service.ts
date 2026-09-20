@@ -2,13 +2,15 @@ import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { hashToken } from "../../lib/jwt";
 import type { UpdateAlertsInput, UpdateLimitsInput } from "./security.validators";
+import { recordAudit } from "../audit/audit.service";
+import type { RequestMeta } from "../../lib/requestMeta";
 
 export async function getAlerts(userId: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   return { compra: user.alertPurchase, retiro: user.alertWithdraw, login: user.alertLogin, promo: user.alertPromo };
 }
 
-export async function updateAlerts(userId: string, input: UpdateAlertsInput) {
+export async function updateAlerts(userId: string, input: UpdateAlertsInput, meta?: RequestMeta) {
   const updated = await prisma.user.update({
     where: { id: userId },
     data: {
@@ -18,6 +20,7 @@ export async function updateAlerts(userId: string, input: UpdateAlertsInput) {
       alertPromo: input.promo,
     },
   });
+  await recordAudit({ userId, category: "SEGURIDAD", action: "alerts_updated", metadata: { ...input }, meta });
   return { compra: updated.alertPurchase, retiro: updated.alertWithdraw, login: updated.alertLogin, promo: updated.alertPromo };
 }
 
@@ -31,7 +34,7 @@ export async function getLimits(userId: string) {
   };
 }
 
-export async function updateLimits(userId: string, input: UpdateLimitsInput) {
+export async function updateLimits(userId: string, input: UpdateLimitsInput, meta?: RequestMeta) {
   const updated = await prisma.account.update({
     where: { userId },
     data: {
@@ -41,6 +44,7 @@ export async function updateLimits(userId: string, input: UpdateLimitsInput) {
       geoIntl: input.geoIntl,
     },
   });
+  await recordAudit({ userId, category: "SEGURIDAD", action: "limits_updated", metadata: { ...input }, meta });
   return {
     limitOnline: Number(updated.limitOnline),
     limitAtm: Number(updated.limitAtm),
@@ -71,16 +75,30 @@ export async function listSessions(userId: string, currentRefreshToken?: string)
   }));
 }
 
-export async function revokeSession(userId: string, sessionId: string) {
+export async function revokeSession(userId: string, sessionId: string, meta?: RequestMeta) {
   const session = await prisma.refreshToken.findFirst({ where: { id: sessionId, userId, revokedAt: null } });
   if (!session) throw new HttpError(404, "Sesión no encontrada");
   await prisma.refreshToken.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
+  await recordAudit({
+    userId,
+    category: "SESION",
+    action: "session_revoked",
+    metadata: { sessionId, device: describeDevice(session.userAgent), ip: session.ip },
+    meta,
+  });
 }
 
-export async function revokeOtherSessions(userId: string, currentRefreshToken: string) {
+export async function revokeOtherSessions(userId: string, currentRefreshToken: string, meta?: RequestMeta) {
   const currentHash = hashToken(currentRefreshToken);
-  await prisma.refreshToken.updateMany({
+  const result = await prisma.refreshToken.updateMany({
     where: { userId, revokedAt: null, tokenHash: { not: currentHash } },
     data: { revokedAt: new Date() },
+  });
+  await recordAudit({
+    userId,
+    category: "SESION",
+    action: "sessions_revoked_others",
+    metadata: { count: result.count },
+    meta,
   });
 }

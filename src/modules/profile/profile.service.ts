@@ -3,6 +3,8 @@ import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { requestProfileOtp as sendProfileOtp, verifyProfileOtp } from "../verification/otp.service";
 import type { UpdateEmailInput, UpdatePasswordInput, UpdatePhoneInput } from "./profile.validators";
+import { recordAudit } from "../audit/audit.service";
+import type { RequestMeta } from "../../lib/requestMeta";
 
 const PASSWORD_SALT_ROUNDS = 12;
 
@@ -19,7 +21,7 @@ export async function requestProfileOtp(userId: string): Promise<void> {
   await sendProfileOtp(user.email);
 }
 
-export async function updateEmail(userId: string, input: UpdateEmailInput) {
+export async function updateEmail(userId: string, input: UpdateEmailInput, meta?: RequestMeta) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
   if (input.newEmail === user.email) {
@@ -34,10 +36,17 @@ export async function updateEmail(userId: string, input: UpdateEmailInput) {
   await verifyProfileOtp(user.email, input.otpCode);
 
   const updated = await prisma.user.update({ where: { id: userId }, data: { email: input.newEmail } });
+  await recordAudit({
+    userId,
+    category: "PERFIL",
+    action: "email_updated",
+    metadata: { previousEmail: user.email, newEmail: input.newEmail },
+    meta,
+  });
   return toPublicUser(updated);
 }
 
-export async function updatePhone(userId: string, input: UpdatePhoneInput) {
+export async function updatePhone(userId: string, input: UpdatePhoneInput, meta?: RequestMeta) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
   if (input.newPhone === user.phone) {
@@ -52,14 +61,22 @@ export async function updatePhone(userId: string, input: UpdatePhoneInput) {
   await verifyProfileOtp(user.email, input.otpCode);
 
   const updated = await prisma.user.update({ where: { id: userId }, data: { phone: input.newPhone } });
+  await recordAudit({
+    userId,
+    category: "PERFIL",
+    action: "phone_updated",
+    metadata: { previousPhone: user.phone, newPhone: input.newPhone },
+    meta,
+  });
   return toPublicUser(updated);
 }
 
-export async function updatePassword(userId: string, input: UpdatePasswordInput): Promise<void> {
+export async function updatePassword(userId: string, input: UpdatePasswordInput, meta?: RequestMeta): Promise<void> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
   const matches = await bcrypt.compare(input.currentPassword, user.passwordHash);
   if (!matches) {
+    await recordAudit({ userId, category: "PERFIL", action: "password_update_failed_wrong_current", success: false, meta });
     throw new HttpError(401, "Tu contraseña actual no es correcta");
   }
 
@@ -67,4 +84,5 @@ export async function updatePassword(userId: string, input: UpdatePasswordInput)
 
   const passwordHash = await bcrypt.hash(input.newPassword, PASSWORD_SALT_ROUNDS);
   await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  await recordAudit({ userId, category: "PERFIL", action: "password_updated", meta });
 }

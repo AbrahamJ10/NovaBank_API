@@ -2,6 +2,8 @@ import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { recordTransaction } from "../transactions/transactions.service";
 import { requestTransferOtp, verifyTransferOtp } from "../verification/otp.service";
+import { recordAudit } from "../audit/audit.service";
+import type { RequestMeta } from "../../lib/requestMeta";
 
 export type ExecuteTransferInput = {
   payeeId: string;
@@ -19,7 +21,7 @@ export async function requestTransfer(email: string) {
   await requestTransferOtp(email);
 }
 
-export async function executeTransfer(userId: string, email: string, input: ExecuteTransferInput) {
+export async function executeTransfer(userId: string, email: string, input: ExecuteTransferInput, meta?: RequestMeta) {
   // Verifying the code first means a wrong/expired code never even reveals
   // whether the destination account exists or has enough balance behind it.
   await verifyTransferOtp(email, input.otpCode);
@@ -35,6 +37,14 @@ export async function executeTransfer(userId: string, email: string, input: Exec
   // Mirrors a real bank's own rejection reasons (closed/frozen destination)
   // instead of silently succeeding — the sender's balance stays untouched.
   if (payee.inactive) {
+    await recordAudit({
+      userId,
+      category: "TRANSFERENCIA",
+      action: "transfer_failed_inactive_payee",
+      success: false,
+      metadata: { payeeId: payee.id, payeeName: payee.name, amount: input.amount },
+      meta,
+    });
     throw new HttpError(422, "La cuenta destino está inactiva", {
       reasonCode: "R-3204",
       reasonLabel: "Cuenta destino inactiva",
@@ -45,6 +55,14 @@ export async function executeTransfer(userId: string, email: string, input: Exec
     throw new HttpError(400, "El monto debe ser mayor a cero");
   }
   if (Number(account.availableBalance) < input.amount) {
+    await recordAudit({
+      userId,
+      category: "TRANSFERENCIA",
+      action: "transfer_failed_insufficient_balance",
+      success: false,
+      metadata: { payeeId: payee.id, payeeName: payee.name, amount: input.amount },
+      meta,
+    });
     throw new HttpError(400, "Saldo insuficiente");
   }
 
@@ -58,6 +76,14 @@ export async function executeTransfer(userId: string, email: string, input: Exec
   const alreadySent = Number(sentRecently._sum.amount ?? 0);
   const limitOnline = Number(account.limitOnline);
   if (alreadySent + input.amount > limitOnline) {
+    await recordAudit({
+      userId,
+      category: "TRANSFERENCIA",
+      action: "transfer_failed_limit_exceeded",
+      success: false,
+      metadata: { payeeId: payee.id, payeeName: payee.name, amount: input.amount, limitOnline },
+      meta,
+    });
     throw new HttpError(422, "Superaste tu límite de transferencias en línea", {
       reasonCode: "R-LIMIT",
       reasonLabel: `Límite diario de S/ ${limitOnline.toFixed(2)} superado`,
@@ -92,6 +118,21 @@ export async function executeTransfer(userId: string, email: string, input: Exec
         iconFg: "#133A63",
       }
     );
+  });
+
+  await recordAudit({
+    userId,
+    category: "TRANSFERENCIA",
+    action: "transfer_completed",
+    metadata: {
+      payeeId: payee.id,
+      payeeName: payee.name,
+      payeeBank: payee.bank,
+      payeeAccount: payee.accountNumber,
+      amount: input.amount,
+      concept: input.concept,
+    },
+    meta,
   });
 
   return {
