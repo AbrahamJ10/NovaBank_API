@@ -1,0 +1,27 @@
+name: Limpieza diaria de datos vencidos
+
+on:
+  schedule:
+    # 08:15 UTC = 03:15 hora Perú (UTC-5), justo después del backup diario
+    - cron: '15 8 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Borrar tokens, códigos e historial de login vencidos
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run cleanup

@@ -297,6 +297,8 @@ model Biller {
   fieldPlaceholder String         @map("placeholder_campo")
   active           Boolean        @default(true)
 
+  bills            Bill[]
+
   createdAt        DateTime       @default(now()) @map("creado_en")
 
   @@map("proveedores_servicio")
@@ -313,6 +315,7 @@ model Bill {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   billerKey    String   @map("proveedor")
+  biller       Biller   @relation(fields: [billerKey], references: [key])
   supplyNumber String   @map("numero_suministro")
 
   name        String
@@ -328,7 +331,7 @@ model Bill {
   createdAt   DateTime @default(now()) @map("creado_en")
 
   @@unique([userId, billerKey, supplyNumber])
-  @@index([userId, paid])
+  @@index([userId, paid, dueDate])
   @@map("servicios")
 }
 
