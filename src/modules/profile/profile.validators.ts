@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { passwordSchema } from "../../lib/passwordPolicy";
 
 const otpCode = z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos");
 
@@ -14,11 +15,7 @@ export const updatePhoneSchema = z.object({
 
 export const updatePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Ingresa tu contraseña actual"),
-  newPassword: z
-    .string()
-    .min(8, "La nueva contraseña debe tener al menos 8 caracteres")
-    .regex(/\d/, "La nueva contraseña debe incluir un número")
-    .regex(/[A-Z]/, "La nueva contraseña debe incluir una mayúscula"),
+  newPassword: passwordSchema,
   otpCode,
 });
 
