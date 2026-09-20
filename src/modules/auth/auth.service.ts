@@ -275,11 +275,17 @@ export async function refresh(refreshToken: string, meta: RequestMeta) {
 export async function requestPasswordReset(input: PasswordResetRequestInput) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 
-  // Same response whether or not the account exists, so this endpoint can't
-  // be used to check which emails are registered (user enumeration).
-  if (user && user.isActive) {
-    await requestPasswordResetOtp(input.email);
+  // Deliberately reveals that *something* is wrong with this email (without
+  // saying whether it's unregistered, inactive, or something else) so the
+  // app can stop the flow here instead of pretending a code was sent. This
+  // is a product choice traded against textbook user-enumeration hardening
+  // (a generic always-204 response) — the message is intentionally vague so
+  // it doesn't confirm which specific case applies.
+  if (!user || !user.isActive) {
+    throw new HttpError(404, "Esta cuenta no está disponible en este momento.");
   }
+
+  await requestPasswordResetOtp(input.email);
 }
 
 export async function confirmPasswordReset(input: PasswordResetConfirmInput) {
