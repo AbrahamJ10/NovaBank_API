@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { recordTransaction } from "../transactions/transactions.service";
 import { verifyProfileOtp } from "../verification/otp.service";
+import { encrypt, decrypt } from "../../lib/crypto";
 
 // A tiny starter line so a fresh account isn't stuck at zero everywhere —
 // this is an internal-ledger number only, not underwritten credit.
@@ -66,9 +67,9 @@ export async function createAccountForUser(db: Db, userId: string) {
           userId,
           accountNumber,
           cci: generateCci(),
-          cardNumber: generateCardNumber(),
+          cardNumber: encrypt(generateCardNumber()),
           cardExpiry: generateCardExpiry(),
-          cardCvv: generateCvv(),
+          cardCvv: encrypt(generateCvv()),
           creditLine: STARTER_CREDIT_LINE,
         },
       });
@@ -91,7 +92,7 @@ export async function getAccountSummary(userId: string) {
   return {
     accountNumber: account.accountNumber,
     cci: account.cci,
-    cardNumber: account.cardNumber,
+    cardNumber: decrypt(account.cardNumber),
     cardExpiry: account.cardExpiry,
     availableBalance: Number(account.availableBalance),
     heldBalance: Number(account.heldBalance),
@@ -116,7 +117,7 @@ export async function revealCvv(userId: string, otpCode: string) {
 
   await verifyProfileOtp(user.email, otpCode);
 
-  return { cvv: account.cardCvv };
+  return { cvv: decrypt(account.cardCvv) };
 }
 
 export async function setCardBlocked(userId: string, blocked: boolean) {
