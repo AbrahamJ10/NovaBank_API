@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { recordTransaction } from "../transactions/transactions.service";
+import { verifyProfileOtp } from "../verification/otp.service";
 
 // A tiny starter line so a fresh account isn't stuck at zero everywhere —
 // this is an internal-ledger number only, not underwritten credit.
@@ -28,6 +29,10 @@ function generateCci() {
 
 function generateCardNumber() {
   return `4${randomDigits(15)}`; // Visa-shaped: starts with 4, 16 digits
+}
+
+function generateCvv() {
+  return randomDigits(3);
 }
 
 function generateCardExpiry() {
@@ -63,6 +68,7 @@ export async function createAccountForUser(db: Db, userId: string) {
           cci: generateCci(),
           cardNumber: generateCardNumber(),
           cardExpiry: generateCardExpiry(),
+          cardCvv: generateCvv(),
           creditLine: STARTER_CREDIT_LINE,
         },
       });
@@ -96,6 +102,21 @@ export async function getAccountSummary(userId: string) {
     cardBlocked: account.cardBlocked,
     memberSince: account.createdAt,
   };
+}
+
+// Confirmed with the same email OTP used for profile changes (see
+// profile.service.ts) — the CVV is only ever readable after proving control
+// of the account's verified email, same bar as changing the password.
+export async function revealCvv(userId: string, otpCode: string) {
+  const [user, account] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+    prisma.account.findUnique({ where: { userId } }),
+  ]);
+  if (!account) throw new HttpError(404, "Cuenta no encontrada");
+
+  await verifyProfileOtp(user.email, otpCode);
+
+  return { cvv: account.cardCvv };
 }
 
 export async function setCardBlocked(userId: string, blocked: boolean) {

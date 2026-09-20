@@ -160,6 +160,7 @@ model Account {
   cci              String   @unique
   cardNumber       String   @map("numero_tarjeta")
   cardExpiry       String   @map("vencimiento_tarjeta")
+  cardCvv          String   @map("cvv_tarjeta")
 
   availableBalance Decimal  @default(0) @db.Decimal(12, 2) @map("saldo_disponible")
   heldBalance      Decimal  @default(0) @db.Decimal(12, 2) @map("saldo_retenido")

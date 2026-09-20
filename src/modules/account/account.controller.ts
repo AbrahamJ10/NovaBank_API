@@ -23,3 +23,11 @@ export async function payCardHandler(req: AuthenticatedRequest, res: Response) {
   const summary = await accountService.payCard(req.user!.id, amount);
   res.json(summary);
 }
+
+const revealCvvSchema = z.object({ otpCode: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos") });
+
+export async function revealCvvHandler(req: AuthenticatedRequest, res: Response) {
+  const { otpCode } = revealCvvSchema.parse(req.body);
+  const result = await accountService.revealCvv(req.user!.id, otpCode);
+  res.json(result);
+}
