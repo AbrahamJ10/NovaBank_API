@@ -216,7 +216,7 @@ model Transaction {
   name      String              @map("nombre")
   meta      String
   amount    Decimal             @db.Decimal(12, 2) @map("monto")
-  icon      String
+  icon      String              @map("icono")
   iconBg    String              @map("icono_fondo")
   iconFg    String              @map("icono_color")
 
@@ -237,7 +237,7 @@ model Notification {
 
   title     String   @map("titulo")
   body      String   @map("cuerpo")
-  icon      String
+  icon      String   @map("icono")
   iconBg    String   @map("icono_fondo")
   iconFg    String   @map("icono_color")
   unread    Boolean  @default(true) @map("no_leido")
@@ -256,11 +256,11 @@ model Payee {
   userId        String   @map("usuario_id")
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name          String
-  bank          String
+  name          String   @map("nombre")
+  bank          String   @map("banco")
   accountNumber String   @map("numero_cuenta")
-  initials      String
-  inactive      Boolean  @default(false)
+  initials      String   @map("iniciales")
+  inactive      Boolean  @default(false) @map("inactivo")
 
   createdAt     DateTime @default(now()) @map("creado_en")
 
@@ -287,15 +287,15 @@ enum BillerCategory {
 // via prisma/seed.ts.
 model Biller {
   id               String         @id @default(uuid())
-  key              String         @unique
-  name             String
-  category         BillerCategory
-  icon             String
+  key              String         @unique @map("clave")
+  name             String         @map("nombre")
+  category         BillerCategory @map("categoria")
+  icon             String         @map("icono")
   iconBg           String         @map("icono_fondo")
   iconFg           String         @map("icono_color")
   fieldLabel       String         @map("etiqueta_campo")
   fieldPlaceholder String         @map("placeholder_campo")
-  active           Boolean        @default(true)
+  active           Boolean        @default(true) @map("activo")
 
   bills            Bill[]
 
@@ -318,12 +318,12 @@ model Bill {
   biller       Biller   @relation(fields: [billerKey], references: [key])
   supplyNumber String   @map("numero_suministro")
 
-  name        String
+  name        String   @map("nombre")
   meta        String
-  icon        String
-  amount      Decimal  @db.Decimal(12, 2)
+  icon        String   @map("icono")
+  amount      Decimal  @db.Decimal(12, 2) @map("monto")
   dueDate     DateTime @map("fecha_vencimiento")
-  consumption String?
+  consumption String?  @map("consumo")
   paid        Boolean  @default(false) @map("pagado")
   paidAt      DateTime? @map("pagado_en")
   suspended   Boolean  @default(false) @map("suspendido")
@@ -346,8 +346,8 @@ model Withdrawal {
   accountId  String    @map("cuenta_id")
   account    Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
-  code       String    @unique
-  amount     Decimal   @db.Decimal(12, 2)
+  code       String    @unique @map("codigo")
+  amount     Decimal   @db.Decimal(12, 2) @map("monto")
   expiresAt  DateTime  @map("expira_en")
   cancelledAt DateTime? @map("cancelado_en")
 
