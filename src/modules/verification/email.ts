@@ -9,9 +9,9 @@ import { HttpError } from "../../middleware/errorHandler";
 // enviar a cualquier destinatario.
 export type EmailAttachment = { name: string; content: string }; // content va en base64
 
-export async function sendEmail(to: string, subject: string, html: string, attachments?: EmailAttachment[]): Promise<void> {
+export async function sendEmail(destinatario: string, asunto: string, html: string, adjuntos?: EmailAttachment[]): Promise<void> {
   if (env.BREVO_API_KEY && env.BREVO_FROM_EMAIL) {
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    const respuesta = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
         "api-key": env.BREVO_API_KEY,
@@ -20,36 +20,36 @@ export async function sendEmail(to: string, subject: string, html: string, attac
       },
       body: JSON.stringify({
         sender: { name: "NovaBank", email: env.BREVO_FROM_EMAIL },
-        to: [{ email: to }],
-        subject,
+        to: [{ email: destinatario }],
+        subject: asunto,
         htmlContent: html,
-        ...(attachments && attachments.length > 0 ? { attachment: attachments } : {}),
+        ...(adjuntos && adjuntos.length > 0 ? { attachment: adjuntos } : {}),
       }),
     });
 
-    if (!res.ok) {
-      console.error("Brevo error:", res.status, await res.text().catch(() => ""));
+    if (!respuesta.ok) {
+      console.error("Error de Brevo:", respuesta.status, await respuesta.text().catch(() => ""));
       throw new HttpError(502, "No se pudo enviar el correo, intenta de nuevo");
     }
     return;
   }
 
   if (env.RESEND_API_KEY) {
-    const res = await fetch("https://api.resend.com/emails", {
+    const respuesta = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: env.RESEND_FROM,
-        to,
-        subject,
+        to: destinatario,
+        subject: asunto,
         html,
-        ...(attachments && attachments.length > 0
-          ? { attachments: attachments.map((a) => ({ filename: a.name, content: a.content })) }
+        ...(adjuntos && adjuntos.length > 0
+          ? { attachments: adjuntos.map((a) => ({ filename: a.name, content: a.content })) }
           : {}),
       }),
     });
-    if (!res.ok) {
-      console.error("Resend error:", res.status, await res.text().catch(() => ""));
+    if (!respuesta.ok) {
+      console.error("Error de Resend:", respuesta.status, await respuesta.text().catch(() => ""));
       throw new HttpError(502, "No se pudo enviar el correo, intenta de nuevo");
     }
     return;
