@@ -119,6 +119,23 @@ model EmailOtp {
   @@map("codigos_verificacion")
 }
 
+// Cuenta los intentos fallidos de un código OTP por correo+propósito, sin
+// importar cuántos códigos nuevos se hayan pedido mientras tanto — así un
+// código nuevo no resetea el conteo de intentos. Al llegar al máximo, se
+// bloquea la verificación de ese correo+propósito por un tiempo, en vez de
+// solo pedir un código nuevo.
+model BloqueoOtp {
+  id             String     @id @default(uuid())
+  correo         String
+  proposito      OtpPurpose
+  intentos       Int        @default(0)
+  bloqueadoHasta DateTime?  @map("bloqueado_hasta")
+  actualizadoEn  DateTime   @updatedAt @map("actualizado_en")
+
+  @@unique([correo, proposito])
+  @@map("bloqueos_otp")
+}
+
 // Fotos de referencia para el login biométrico con Face ID — se capturan una
 // sola vez durante el registro (con consentimiento explícito del usuario) y
 // se guardan en Cloudinary; aquí solo viven las URLs resultantes. Cada login

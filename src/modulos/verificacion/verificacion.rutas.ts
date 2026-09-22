@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { asyncHandler } from "../../libreria/manejadorAsincrono";
 import { prisma } from "../../libreria/prisma";
-import { solicitarOtpRegistro } from "./otp.servicio";
+import { solicitarOtpRegistro, verificarOtpRegistroPrevio } from "./otp.servicio";
 import { compareFaces } from "./rostro.servicio";
 
 // Los dos endpoints se ejecutan antes de que exista una cuenta, así que
@@ -26,7 +26,20 @@ const limitadorCoincidenciaFacial = rateLimit({
   message: { error: "Demasiados intentos de verificación facial, intenta de nuevo más tarde." },
 });
 
+const limitadorVerificacionOtp = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiados intentos, intenta de nuevo más tarde." },
+});
+
 const esquemaSolicitudOtp = z.object({ email: z.string().trim().toLowerCase().email() });
+
+const esquemaVerificacionOtp = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  code: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos"),
+});
 
 const esquemaCoincidenciaFacial = z.object({
   dni: z.string().regex(/^\d{8}$/),
@@ -42,6 +55,16 @@ verificationRouter.post(
   asyncHandler(async (peticion, respuesta) => {
     const { email } = esquemaSolicitudOtp.parse(peticion.body);
     await solicitarOtpRegistro(email);
+    respuesta.status(204).send();
+  })
+);
+
+verificationRouter.post(
+  "/otp/verify",
+  limitadorVerificacionOtp,
+  asyncHandler(async (peticion, respuesta) => {
+    const { email, code } = esquemaVerificacionOtp.parse(peticion.body);
+    await verificarOtpRegistroPrevio(email, code);
     respuesta.status(204).send();
   })
 );
