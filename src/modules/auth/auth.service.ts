@@ -19,7 +19,7 @@ import { crearCuentaParaUsuario } from "../account/account.service";
 import { sembrarBeneficiariosPorDefecto } from "../payees/payees.service";
 import { sembrarRecibosPorDefecto } from "../bills/bills.service";
 import { compareFaces } from "../verification/face.service";
-import { uploadFaceReference } from "../../lib/cloudinary";
+import { subirReferenciaFacial } from "../../lib/cloudinary";
 import { createNotification } from "../notifications/notifications.service";
 import { recordAudit } from "../audit/audit.service";
 import type { RequestMeta } from "../../lib/requestMeta";
@@ -85,8 +85,8 @@ export async function registrar(entrada: EntradaRegistro, metaSolicitud: Request
   if (entrada.dniPhoto && entrada.selfie) {
     try {
       const [urlFotoDni, urlFotoSelfie] = await Promise.all([
-        uploadFaceReference(entrada.dniPhoto, `${usuario.id}-dni`),
-        uploadFaceReference(entrada.selfie, `${usuario.id}-selfie`),
+        subirReferenciaFacial(entrada.dniPhoto, `${usuario.id}-dni`),
+        subirReferenciaFacial(entrada.selfie, `${usuario.id}-selfie`),
       ]);
       await prisma.faceReference.create({ data: { userId: usuario.id, dniPhotoUrl: urlFotoDni, selfiePhotoUrl: urlFotoSelfie } });
     } catch (error) {

@@ -19,27 +19,27 @@ export interface RecordAuditInput {
 // bloquea ni hace fallar la operación de fondo: una escritura de auditoría
 // rota no debe tumbar una solicitud real de movimiento de dinero, así que
 // los errores aquí solo se registran en el log.
-export async function recordAudit(input: RecordAuditInput): Promise<void> {
+export async function recordAudit(entrada: RecordAuditInput): Promise<void> {
   try {
     await prisma.auditLog.create({
       data: {
-        userId: input.userId ?? null,
-        category: input.category,
-        action: input.action,
-        success: input.success ?? true,
-        description: input.description,
-        metadata: input.metadata as Prisma.InputJsonValue | undefined,
-        screen: input.screen,
-        ip: input.meta?.ip,
-        country: input.meta?.country,
-        city: input.meta?.city,
-        device: input.meta?.device,
-        platform: input.meta?.platform,
-        appVersion: input.meta?.appVersion,
+        userId: entrada.userId ?? null,
+        category: entrada.category,
+        action: entrada.action,
+        success: entrada.success ?? true,
+        description: entrada.description,
+        metadata: entrada.metadata as Prisma.InputJsonValue | undefined,
+        screen: entrada.screen,
+        ip: entrada.meta?.ip,
+        country: entrada.meta?.country,
+        city: entrada.meta?.city,
+        device: entrada.meta?.device,
+        platform: entrada.meta?.platform,
+        appVersion: entrada.meta?.appVersion,
       },
     });
-  } catch (err) {
-    console.error("Failed to record audit log", input.action, err);
+  } catch (error) {
+    console.error("No se pudo registrar la auditoría", entrada.action, error);
   }
 }
 
@@ -58,23 +58,23 @@ export interface ClientAuditEvent {
 // servidor. createdAt siempre es la hora de recepción del servidor (nunca
 // confía en una marca de tiempo que envíe el cliente) para que el rastro
 // no pueda ser adulterado con fecha falsa por un cliente manipulado.
-export async function recordClientEvents(userId: string, events: ClientAuditEvent[], meta: RequestMeta): Promise<void> {
-  if (events.length === 0) return;
+export async function recordClientEvents(idUsuario: string, eventos: ClientAuditEvent[], metaSolicitud: RequestMeta): Promise<void> {
+  if (eventos.length === 0) return;
 
-  const rows: Prisma.AuditLogCreateManyInput[] = events.map((e) => ({
-    userId,
+  const filas: Prisma.AuditLogCreateManyInput[] = eventos.map((e) => ({
+    userId: idUsuario,
     category: AuditCategory.NAVEGACION,
     action: e.action,
     success: e.success ?? true,
     metadata: e.metadata as Prisma.InputJsonValue | undefined,
     screen: e.screen,
-    ip: meta.ip,
-    country: meta.country,
-    city: meta.city,
-    device: meta.device,
-    platform: meta.platform,
-    appVersion: meta.appVersion,
+    ip: metaSolicitud.ip,
+    country: metaSolicitud.country,
+    city: metaSolicitud.city,
+    device: metaSolicitud.device,
+    platform: metaSolicitud.platform,
+    appVersion: metaSolicitud.appVersion,
   }));
 
-  await prisma.auditLog.createMany({ data: rows });
+  await prisma.auditLog.createMany({ data: filas });
 }

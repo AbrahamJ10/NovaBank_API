@@ -8,36 +8,36 @@ import { prisma } from "../lib/prisma";
 // pudiera servir para algo: los tokens revocados/expirados no pueden
 // autenticar, los OTPs expirados no se pueden verificar, y los eventos de
 // login se conservan durante una ventana real de auditoría.
-const DAY_MS = 24 * 60 * 60 * 1000;
+const DIA_MS = 24 * 60 * 60 * 1000;
 
 async function main() {
-  const now = new Date();
+  const ahora = new Date();
 
-  const staleTokens = await prisma.refreshToken.deleteMany({
+  const tokensVencidos = await prisma.refreshToken.deleteMany({
     where: {
       OR: [
-        { revokedAt: { lt: new Date(now.getTime() - 30 * DAY_MS) } },
-        { expiresAt: { lt: new Date(now.getTime() - 30 * DAY_MS) } },
+        { revokedAt: { lt: new Date(ahora.getTime() - 30 * DIA_MS) } },
+        { expiresAt: { lt: new Date(ahora.getTime() - 30 * DIA_MS) } },
       ],
     },
   });
 
-  const staleOtps = await prisma.emailOtp.deleteMany({
-    where: { expiresAt: { lt: new Date(now.getTime() - 7 * DAY_MS) } },
+  const otpsVencidos = await prisma.emailOtp.deleteMany({
+    where: { expiresAt: { lt: new Date(ahora.getTime() - 7 * DIA_MS) } },
   });
 
-  const staleLogins = await prisma.loginEvent.deleteMany({
-    where: { createdAt: { lt: new Date(now.getTime() - 180 * DAY_MS) } },
+  const loginsVencidos = await prisma.loginEvent.deleteMany({
+    where: { createdAt: { lt: new Date(ahora.getTime() - 180 * DIA_MS) } },
   });
 
   console.log(
-    `Cleanup: removed ${staleTokens.count} refresh tokens, ${staleOtps.count} OTP codes, ${staleLogins.count} login events.`
+    `Limpieza: se eliminaron ${tokensVencidos.count} refresh tokens, ${otpsVencidos.count} códigos OTP, ${loginsVencidos.count} eventos de login.`
   );
 }
 
 main()
-  .catch((err) => {
-    console.error(err);
+  .catch((error) => {
+    console.error(error);
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());

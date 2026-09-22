@@ -19,7 +19,7 @@ import { withdrawalsRouter } from "./modules/withdrawals/withdrawals.routes";
 import { qrRouter } from "./modules/qr/qr.routes";
 import { auditRouter } from "./modules/audit/audit.routes";
 
-export function createApp() {
+export function crearApp() {
   const app = express();
 
   applySecurityMiddleware(app);

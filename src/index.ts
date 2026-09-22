@@ -1,8 +1,8 @@
-import { createApp } from "./app";
+import { crearApp } from "./app";
 import { env } from "./config/env";
 
-const app = createApp();
+const app = crearApp();
 
 app.listen(env.PORT, () => {
-  console.log(`NovaBank API listening on port ${env.PORT} (${env.NODE_ENV})`);
+  console.log(`API de NovaBank escuchando en el puerto ${env.PORT} (${env.NODE_ENV})`);
 });

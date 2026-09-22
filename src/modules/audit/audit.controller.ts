@@ -1,11 +1,11 @@
 import { Response } from "express";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
 import { getRequestMeta } from "../../lib/requestMeta";
-import * as auditService from "./audit.service";
-import { recordEventsSchema } from "./audit.validators";
+import * as servicioAuditoria from "./audit.service";
+import { esquemaRegistrarEventos } from "./audit.validators";
 
-export async function recordEventsHandler(req: AuthenticatedRequest, res: Response) {
-  const { events } = recordEventsSchema.parse(req.body);
-  await auditService.recordClientEvents(req.user!.id, events, getRequestMeta(req));
-  res.status(204).send();
+export async function manejadorRegistrarEventos(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { events } = esquemaRegistrarEventos.parse(peticion.body);
+  await servicioAuditoria.recordClientEvents(peticion.user!.id, events, getRequestMeta(peticion));
+  respuesta.status(204).send();
 }

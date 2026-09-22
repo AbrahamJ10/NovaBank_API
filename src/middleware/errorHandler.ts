@@ -8,21 +8,21 @@ export class HttpError extends Error {
   }
 }
 
-export function notFoundHandler(_req: Request, res: Response): void {
-  res.status(404).json({ error: "Recurso no encontrado" });
+export function notFoundHandler(_peticion: Request, respuesta: Response): void {
+  respuesta.status(404).json({ error: "Recurso no encontrado" });
 }
 
 // Manejador de errores centralizado — mantiene los stack traces y detalles
 // internos fuera de las respuestas en producción para no filtrar detalles
 // de implementación a quien llame.
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
-  if (err instanceof ZodError) {
-    res.status(400).json({ error: "Datos inválidos", details: err.flatten() });
+export function errorHandler(error: unknown, _peticion: Request, respuesta: Response, _siguiente: NextFunction): void {
+  if (error instanceof ZodError) {
+    respuesta.status(400).json({ error: "Datos inválidos", details: error.flatten() });
     return;
   }
 
-  if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message, ...(err.details ?? {}) });
+  if (error instanceof HttpError) {
+    respuesta.status(error.status).json({ error: error.message, ...(error.details ?? {}) });
     return;
   }
 
@@ -30,11 +30,11 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   // cuando el cuerpo de la solicitud no es JSON válido — es una solicitud
   // del cliente mal formada, no una falla del servidor, así que esto no
   // debe caer en el 500 genérico de abajo.
-  if (err instanceof SyntaxError && (err as SyntaxError & { status?: number }).status === 400) {
-    res.status(400).json({ error: "El cuerpo de la solicitud no es JSON válido" });
+  if (error instanceof SyntaxError && (error as SyntaxError & { status?: number }).status === 400) {
+    respuesta.status(400).json({ error: "El cuerpo de la solicitud no es JSON válido" });
     return;
   }
 
-  console.error(err);
-  res.status(500).json({ error: env.isProduction ? "Error interno del servidor" : String(err) });
+  console.error(error);
+  respuesta.status(500).json({ error: env.isProduction ? "Error interno del servidor" : String(error) });
 }

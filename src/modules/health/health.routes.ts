@@ -4,14 +4,14 @@ import { asyncHandler } from "../../lib/asyncHandler";
 
 export const healthRouter = Router();
 
-healthRouter.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+healthRouter.get("/health", (_peticion, respuesta) => {
+  respuesta.json({ status: "ok" });
 });
 
 healthRouter.get(
   "/health/db",
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (_peticion, respuesta) => {
     await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: "ok", db: "connected" });
+    respuesta.json({ status: "ok", db: "connected" });
   })
 );
