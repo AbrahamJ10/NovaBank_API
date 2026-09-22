@@ -158,13 +158,14 @@ model FaceReference {
 // diferencia de FaceReference arriba, que es una copia guardada a propósito
 // para logins posteriores).
 model FaceVerificationEvent {
-  id         String   @id @default(uuid())
-  dni        String
-  matched    Boolean  @map("coincidio")
-  confidence Float    @map("confianza")
-  ip         String?
-  userAgent  String?  @map("agente_usuario")
-  createdAt  DateTime @default(now()) @map("creado_en")
+  id           String   @id @default(uuid())
+  dni          String
+  matched      Boolean  @map("coincidio")
+  confidence   Float    @map("confianza")
+  errorMessage String?  @map("mensaje_error")
+  ip           String?
+  userAgent    String?  @map("agente_usuario")
+  createdAt    DateTime @default(now()) @map("creado_en")
 
   @@index([dni])
   @@map("eventos_verificacion_facial")

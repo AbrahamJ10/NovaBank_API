@@ -63,7 +63,9 @@ export async function compareFaces(imagen1: EntradaImagen, imagen2: EntradaImage
 
   if (!respuesta.ok || typeof datos.error_message === "string") {
     console.error("Error de Face++:", respuesta.status, datos.error_message);
-    throw new ErrorHttp(502, "El servicio de verificación facial no está disponible");
+    throw new ErrorHttp(502, "El servicio de verificación facial no está disponible", {
+      faceppError: typeof datos.error_message === "string" ? datos.error_message : `HTTP ${respuesta.status}`,
+    });
   }
 
   if (typeof datos.confidence !== "number") {

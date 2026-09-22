@@ -2,6 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { asyncHandler } from "../../libreria/manejadorAsincrono";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
 import { prisma } from "../../libreria/prisma";
 import { solicitarOtpRegistro, verificarOtpRegistroPrevio } from "./otp.servicio";
 import { compareFaces } from "./rostro.servicio";
@@ -74,12 +75,33 @@ verificationRouter.post(
   limitadorCoincidenciaFacial,
   asyncHandler(async (peticion, respuesta) => {
     const { dni, selfie, dniPhoto } = esquemaCoincidenciaFacial.parse(peticion.body);
-    const resultado = await compareFaces({ base64: selfie }, { base64: dniPhoto });
 
-    await prisma.faceVerificationEvent.create({
-      data: { dni, matched: resultado.matched, confidence: resultado.confidence, ip: peticion.ip, userAgent: peticion.headers["user-agent"] },
-    });
+    try {
+      const resultado = await compareFaces({ base64: selfie }, { base64: dniPhoto });
+      await prisma.faceVerificationEvent.create({
+        data: { dni, matched: resultado.matched, confidence: resultado.confidence, ip: peticion.ip, userAgent: peticion.headers["user-agent"] },
+      });
+      respuesta.json(resultado);
+    } catch (error) {
+      // Se registra también el intento fallido (con el detalle real del
+      // proveedor) para poder diagnosticar sin acceso a los logs del
+      // servidor — pero ese detalle nunca se expone en la respuesta al cliente.
+      const detalleProveedor = error instanceof ErrorHttp ? (error.details?.faceppError as string | undefined) : undefined;
+      await prisma.faceVerificationEvent
+        .create({
+          data: {
+            dni,
+            matched: false,
+            confidence: -1,
+            errorMessage: detalleProveedor ?? (error instanceof Error ? error.message : "error desconocido"),
+            ip: peticion.ip,
+            userAgent: peticion.headers["user-agent"],
+          },
+        })
+        .catch(() => {});
 
-    respuesta.json(resultado);
+      if (error instanceof ErrorHttp) throw new ErrorHttp(error.status, error.message);
+      throw error;
+    }
   })
 );
