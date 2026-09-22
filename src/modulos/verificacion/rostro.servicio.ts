@@ -18,6 +18,27 @@ function establecerCampoImagen(form: URLSearchParams, indice: 1 | 2, imagen: Ent
   }
 }
 
+function esperar(ms: number) {
+  return new Promise((resolver) => setTimeout(resolver, ms));
+}
+
+async function llamarComparacion(imagen1: EntradaImagen, imagen2: EntradaImagen) {
+  const form = new URLSearchParams();
+  form.set("api_key", env.FACEPP_API_KEY!);
+  form.set("api_secret", env.FACEPP_API_SECRET!);
+  establecerCampoImagen(form, 1, imagen1);
+  establecerCampoImagen(form, 2, imagen2);
+
+  const respuesta = await fetch(`${env.FACEPP_API_BASE}/facepp/v3/compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
+  });
+
+  const datos = (await respuesta.json().catch(() => ({}))) as Record<string, unknown>;
+  return { respuesta, datos };
+}
+
 // Compara dos rostros (cada uno dado como base64 o una URL alojada) usando
 // Face++ (facepp.com) — un modelo genérico de comparación facial, no una
 // coincidencia biométrica oficial de RENIEC (ese nivel de acceso no se
@@ -29,19 +50,16 @@ export async function compareFaces(imagen1: EntradaImagen, imagen2: EntradaImage
     throw new ErrorHttp(503, "El servicio de verificación facial no está configurado");
   }
 
-  const form = new URLSearchParams();
-  form.set("api_key", env.FACEPP_API_KEY);
-  form.set("api_secret", env.FACEPP_API_SECRET);
-  establecerCampoImagen(form, 1, imagen1);
-  establecerCampoImagen(form, 2, imagen2);
+  let { respuesta, datos } = await llamarComparacion(imagen1, imagen2);
 
-  const respuesta = await fetch(`${env.FACEPP_API_BASE}/facepp/v3/compare`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-  });
-
-  const datos = (await respuesta.json().catch(() => ({}))) as Record<string, unknown>;
+  // El plan de Face++ en uso solo admite una solicitud a la vez — si dos
+  // llegan solapadas (p. ej. el usuario cancela y reintenta muy rápido),
+  // responde con este error puntual y transitorio. Un solo reintento tras
+  // una breve espera resuelve la gran mayoría de estos casos.
+  if (datos.error_message === "CONCURRENCY_LIMIT_EXCEEDED") {
+    await esperar(1200);
+    ({ respuesta, datos } = await llamarComparacion(imagen1, imagen2));
+  }
 
   if (!respuesta.ok || typeof datos.error_message === "string") {
     console.error("Error de Face++:", respuesta.status, datos.error_message);
