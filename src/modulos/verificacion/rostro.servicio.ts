@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { env } from "../../configuracion/entorno";
 import { ErrorHttp } from "../../intermediarios/manejadorErrores";
 
@@ -10,11 +11,25 @@ function quitarPrefijoDataUri(base64: string) {
   return base64.startsWith("data:") && indiceComa !== -1 ? base64.slice(indiceComa + 1) : base64;
 }
 
-function establecerCampoImagen(form: URLSearchParams, indice: 1 | 2, imagen: EntradaImagen) {
+// La foto del DNI se captura en alta resolución para que el OCR lea bien el
+// texto, así que su base64 puede superar el límite de tamaño de Face++
+// (2 MB). Aquí se reduce solo la copia que se envía a comparar, sin tocar
+// la foto original que ya se usó para leer los datos del documento.
+async function comprimirParaFacepp(base64: string): Promise<string> {
+  const buffer = Buffer.from(quitarPrefijoDataUri(base64), "base64");
+  const comprimido = await sharp(buffer)
+    .rotate()
+    .resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+  return comprimido.toString("base64");
+}
+
+async function establecerCampoImagen(form: URLSearchParams, indice: 1 | 2, imagen: EntradaImagen) {
   if ("url" in imagen) {
     form.set(`image_url${indice}`, imagen.url);
   } else {
-    form.set(`image_base64_${indice}`, quitarPrefijoDataUri(imagen.base64));
+    form.set(`image_base64_${indice}`, await comprimirParaFacepp(imagen.base64));
   }
 }
 
@@ -26,8 +41,8 @@ async function llamarComparacion(imagen1: EntradaImagen, imagen2: EntradaImagen)
   const form = new URLSearchParams();
   form.set("api_key", env.FACEPP_API_KEY!);
   form.set("api_secret", env.FACEPP_API_SECRET!);
-  establecerCampoImagen(form, 1, imagen1);
-  establecerCampoImagen(form, 2, imagen2);
+  await establecerCampoImagen(form, 1, imagen1);
+  await establecerCampoImagen(form, 2, imagen2);
 
   const respuesta = await fetch(`${env.FACEPP_API_BASE}/facepp/v3/compare`, {
     method: "POST",
