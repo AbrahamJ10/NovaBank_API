@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json && prisma generate",
+    "build": "tsc -p tsconfig.json && node -e \"require('fs').cpSync('src/assets','dist/assets',{recursive:true})\" && prisma generate",
     "start": "node dist/index.js",
     "postinstall": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",

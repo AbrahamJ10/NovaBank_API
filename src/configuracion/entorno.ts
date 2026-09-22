@@ -22,6 +22,7 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
+  PUBLIC_BASE_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -35,4 +36,7 @@ export const env = {
   ...parsed.data,
   corsOrigins: parsed.data.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean),
   isProduction: parsed.data.NODE_ENV === "production",
+  // Render expone esta variable sola en cada servicio web — sirve de
+  // respaldo si no se configuró PUBLIC_BASE_URL a mano.
+  publicBaseUrl: parsed.data.PUBLIC_BASE_URL ?? process.env.RENDER_EXTERNAL_URL ?? "https://novabank-api-o6dx.onrender.com",
 };

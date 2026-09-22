@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import { applySecurityMiddleware } from "./intermediarios/seguridad";
 import { generalLimiter } from "./intermediarios/limiteTasa";
 import { errorHandler, notFoundHandler } from "./intermediarios/manejadorErrores";
@@ -28,6 +29,10 @@ export function crearApp() {
   // límite de solicitudes aparte.
   app.use(express.json({ limit: "8mb" }));
   app.use(generalLimiter);
+
+  // Público y de solo lectura (logo y afines para incrustar en correos) —
+  // no expone nada sensible, así que no necesita auth ni límite de tasa.
+  app.use("/assets", express.static(path.join(__dirname, "assets")));
 
   app.use(healthRouter);
   app.use("/api/auth", authRouter);
