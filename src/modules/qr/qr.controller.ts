@@ -1,11 +1,11 @@
 import { Response } from "express";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
-import * as qrService from "./qr.service";
-import { payQrSchema } from "./qr.validators";
+import * as servicioQr from "./qr.service";
+import { esquemaPagoQr } from "./qr.validators";
 import { getRequestMeta } from "../../lib/requestMeta";
 
-export async function payQrHandler(req: AuthenticatedRequest, res: Response) {
-  const input = payQrSchema.parse(req.body);
-  const receipt = await qrService.payQr(req.user!.id, input, getRequestMeta(req));
-  res.status(201).json(receipt);
+export async function manejadorPagoQr(peticion: AuthenticatedRequest, respuesta: Response) {
+  const entrada = esquemaPagoQr.parse(peticion.body);
+  const recibo = await servicioQr.pagarQr(peticion.user!.id, entrada, getRequestMeta(peticion));
+  respuesta.status(201).json(recibo);
 }

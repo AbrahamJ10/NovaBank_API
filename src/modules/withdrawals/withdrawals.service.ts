@@ -5,69 +5,69 @@ import { recordTransaction } from "../transactions/transactions.service";
 import { recordAudit } from "../audit/audit.service";
 import type { RequestMeta } from "../../lib/requestMeta";
 
-const WITHDRAW_TTL_MS = 30 * 60 * 1000;
+const RETIRO_TTL_MS = 30 * 60 * 1000;
 
-function generateCode() {
+function generarCodigo() {
   let s = "";
   for (let i = 0; i < 8; i++) s += Math.floor(Math.random() * 10);
   return s;
 }
 
-function toPublic(w: { id: string; code: string; amount: Prisma.Decimal; expiresAt: Date }) {
-  return { id: w.id, code: w.code, amount: Number(w.amount), expiresAt: w.expiresAt };
+function aPublico(retiro: { id: string; code: string; amount: Prisma.Decimal; expiresAt: Date }) {
+  return { id: retiro.id, code: retiro.code, amount: Number(retiro.amount), expiresAt: retiro.expiresAt };
 }
 
-export async function createWithdrawal(userId: string, amount: number, meta?: RequestMeta) {
-  const [account, user] = await Promise.all([
-    prisma.account.findUnique({ where: { userId } }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+export async function crearRetiro(idUsuario: string, monto: number, metaSolicitud?: RequestMeta) {
+  const [cuenta, usuario] = await Promise.all([
+    prisma.account.findUnique({ where: { userId: idUsuario } }),
+    prisma.user.findUniqueOrThrow({ where: { id: idUsuario } }),
   ]);
-  if (!account) throw new HttpError(404, "Cuenta no encontrada");
-  if (amount <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
-  if (Number(account.availableBalance) < amount) throw new HttpError(400, "Saldo insuficiente");
-  if (amount > Number(account.limitAtm)) {
+  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (monto <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
+  if (Number(cuenta.availableBalance) < monto) throw new HttpError(400, "Saldo insuficiente");
+  if (monto > Number(cuenta.limitAtm)) {
     throw new HttpError(422, "Superaste tu límite de retiro en cajeros", {
       reasonCode: "R-LIMIT",
-      reasonLabel: `Límite de retiro de S/ ${Number(account.limitAtm).toFixed(2)} superado`,
+      reasonLabel: `Límite de retiro de S/ ${Number(cuenta.limitAtm).toFixed(2)} superado`,
     });
   }
 
-  const withdrawal = await prisma.$transaction(async (tx) => {
-    await tx.account.update({ where: { userId }, data: { availableBalance: { decrement: amount } } });
+  const retiro = await prisma.$transaction(async (tx) => {
+    await tx.account.update({ where: { userId: idUsuario }, data: { availableBalance: { decrement: monto } } });
 
-    let created;
-    for (let attempt = 0; attempt < 5; attempt++) {
+    let creado;
+    for (let intento = 0; intento < 5; intento++) {
       try {
-        created = await tx.withdrawal.create({
-          data: { userId, accountId: account.id, code: generateCode(), amount, expiresAt: new Date(Date.now() + WITHDRAW_TTL_MS) },
+        creado = await tx.withdrawal.create({
+          data: { userId: idUsuario, accountId: cuenta.id, code: generarCodigo(), amount: monto, expiresAt: new Date(Date.now() + RETIRO_TTL_MS) },
         });
         break;
-      } catch (err) {
-        const isUniqueClash = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
-        if (isUniqueClash && attempt < 4) continue;
-        throw err;
+      } catch (error) {
+        const esChoqueDeUnicidad = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+        if (esChoqueDeUnicidad && intento < 4) continue;
+        throw error;
       }
     }
-    if (!created) throw new HttpError(500, "No se pudo generar la clave, intenta de nuevo");
+    if (!creado) throw new HttpError(500, "No se pudo generar la clave, intenta de nuevo");
 
     await recordTransaction(
       tx,
-      userId,
-      account.id,
+      idUsuario,
+      cuenta.id,
       {
         kind: "DEBIT",
         category: "RETIROS",
         name: "Retiro sin tarjeta",
-        meta: `Código ${created.code}`,
-        amount,
+        meta: `Código ${creado.code}`,
+        amount: monto,
         icon: "local-atm",
         iconBg: "#F4F6F9",
         iconFg: "#33414F",
       },
-      user.alertWithdraw
+      usuario.alertWithdraw
         ? {
             title: "Retiro sin tarjeta generado",
-            body: `Generaste una clave para retirar S/ ${amount.toFixed(2)} sin tarjeta.`,
+            body: `Generaste una clave para retirar S/ ${monto.toFixed(2)} sin tarjeta.`,
             icon: "local-atm",
             iconBg: "#F4F6F9",
             iconFg: "#33414F",
@@ -75,49 +75,49 @@ export async function createWithdrawal(userId: string, amount: number, meta?: Re
         : null
     );
 
-    return created;
+    return creado;
   });
 
   await recordAudit({
-    userId,
+    userId: idUsuario,
     category: "RETIRO",
     action: "withdrawal_created",
-    metadata: { withdrawalId: withdrawal.id, amount },
-    meta,
+    metadata: { withdrawalId: retiro.id, amount: monto },
+    meta: metaSolicitud,
   });
 
-  return toPublic(withdrawal);
+  return aPublico(retiro);
 }
 
-export async function cancelWithdrawal(userId: string, id: string, meta?: RequestMeta) {
-  const withdrawal = await prisma.withdrawal.findFirst({ where: { id, userId } });
-  if (!withdrawal) throw new HttpError(404, "Retiro no encontrado");
-  if (withdrawal.cancelledAt) throw new HttpError(409, "Este retiro ya fue cancelado");
+export async function cancelarRetiro(idUsuario: string, id: string, metaSolicitud?: RequestMeta) {
+  const retiro = await prisma.withdrawal.findFirst({ where: { id, userId: idUsuario } });
+  if (!retiro) throw new HttpError(404, "Retiro no encontrado");
+  if (retiro.cancelledAt) throw new HttpError(409, "Este retiro ya fue cancelado");
 
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  const amount = Number(withdrawal.amount);
+  const usuario = await prisma.user.findUniqueOrThrow({ where: { id: idUsuario } });
+  const monto = Number(retiro.amount);
 
   await prisma.$transaction(async (tx) => {
-    await tx.account.update({ where: { userId }, data: { availableBalance: { increment: amount } } });
-    await tx.withdrawal.update({ where: { id: withdrawal.id }, data: { cancelledAt: new Date() } });
+    await tx.account.update({ where: { userId: idUsuario }, data: { availableBalance: { increment: monto } } });
+    await tx.withdrawal.update({ where: { id: retiro.id }, data: { cancelledAt: new Date() } });
     await recordTransaction(
       tx,
-      userId,
-      withdrawal.accountId,
+      idUsuario,
+      retiro.accountId,
       {
         kind: "CREDIT",
         category: "RETIROS",
         name: "Reembolso — retiro cancelado",
-        meta: `Código ${withdrawal.code}`,
-        amount,
+        meta: `Código ${retiro.code}`,
+        amount: monto,
         icon: "local-atm",
         iconBg: "#EAF9F1",
         iconFg: "#21A26B",
       },
-      user.alertWithdraw
+      usuario.alertWithdraw
         ? {
             title: "Retiro cancelado",
-            body: `Cancelaste tu clave de retiro y te devolvimos S/ ${amount.toFixed(2)}.`,
+            body: `Cancelaste tu clave de retiro y te devolvimos S/ ${monto.toFixed(2)}.`,
             icon: "local-atm",
             iconBg: "#EAF9F1",
             iconFg: "#21A26B",
@@ -127,37 +127,37 @@ export async function cancelWithdrawal(userId: string, id: string, meta?: Reques
   });
 
   await recordAudit({
-    userId,
+    userId: idUsuario,
     category: "RETIRO",
     action: "withdrawal_cancelled",
-    metadata: { withdrawalId: withdrawal.id, amount },
-    meta,
+    metadata: { withdrawalId: retiro.id, amount: monto },
+    meta: metaSolicitud,
   });
 }
 
-export async function renewWithdrawal(userId: string, id: string, meta?: RequestMeta) {
-  const withdrawal = await prisma.withdrawal.findFirst({ where: { id, userId } });
-  if (!withdrawal) throw new HttpError(404, "Retiro no encontrado");
-  if (withdrawal.cancelledAt) throw new HttpError(409, "Este retiro ya fue cancelado");
+export async function renovarRetiro(idUsuario: string, id: string, metaSolicitud?: RequestMeta) {
+  const retiro = await prisma.withdrawal.findFirst({ where: { id, userId: idUsuario } });
+  if (!retiro) throw new HttpError(404, "Retiro no encontrado");
+  if (retiro.cancelledAt) throw new HttpError(409, "Este retiro ya fue cancelado");
 
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let intento = 0; intento < 5; intento++) {
     try {
-      const updated = await prisma.withdrawal.update({
-        where: { id: withdrawal.id },
-        data: { code: generateCode(), expiresAt: new Date(Date.now() + WITHDRAW_TTL_MS) },
+      const actualizado = await prisma.withdrawal.update({
+        where: { id: retiro.id },
+        data: { code: generarCodigo(), expiresAt: new Date(Date.now() + RETIRO_TTL_MS) },
       });
       await recordAudit({
-        userId,
+        userId: idUsuario,
         category: "RETIRO",
         action: "withdrawal_renewed",
-        metadata: { withdrawalId: withdrawal.id, amount: Number(withdrawal.amount) },
-        meta,
+        metadata: { withdrawalId: retiro.id, amount: Number(retiro.amount) },
+        meta: metaSolicitud,
       });
-      return toPublic(updated);
-    } catch (err) {
-      const isUniqueClash = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
-      if (isUniqueClash && attempt < 4) continue;
-      throw err;
+      return aPublico(actualizado);
+    } catch (error) {
+      const esChoqueDeUnicidad = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+      if (esChoqueDeUnicidad && intento < 4) continue;
+      throw error;
     }
   }
   throw new HttpError(500, "No se pudo renovar la clave, intenta de nuevo");

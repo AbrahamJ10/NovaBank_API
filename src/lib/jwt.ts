@@ -28,7 +28,7 @@ export function hashToken(token: string): string {
 
 export function refreshTtlToDate(): Date {
   const match = /^(\d+)([smhd])$/.exec(env.JWT_REFRESH_TTL);
-  if (!match) throw new Error("Invalid JWT_REFRESH_TTL format");
+  if (!match) throw new Error("Formato de JWT_REFRESH_TTL inválido");
   const value = Number(match[1]);
   const unit = match[2];
   const unitMs: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };

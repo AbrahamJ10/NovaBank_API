@@ -15,9 +15,9 @@ import type {
   RegisterInput,
 } from "./auth.validators";
 import { requestPasswordResetOtp, verifyPasswordResetOtp, verifyRegisterOtp } from "../verification/otp.service";
-import { createAccountForUser } from "../account/account.service";
+import { crearCuentaParaUsuario } from "../account/account.service";
 import { seedDefaultPayees } from "../payees/payees.service";
-import { seedDefaultBills } from "../bills/bills.service";
+import { sembrarRecibosPorDefecto } from "../bills/bills.service";
 import { compareFaces } from "../verification/face.service";
 import { uploadFaceReference } from "../../lib/cloudinary";
 import { createNotification } from "../notifications/notifications.service";
@@ -73,9 +73,9 @@ export async function register(input: RegisterInput, meta: RequestMeta) {
         dni: input.dni,
       },
     });
-    await createAccountForUser(tx, created.id);
+    await crearCuentaParaUsuario(tx, created.id);
     await seedDefaultPayees(tx, created.id);
-    await seedDefaultBills(tx, created.id);
+    await sembrarRecibosPorDefecto(tx, created.id);
     return created;
   });
 

@@ -3,7 +3,7 @@ import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { recordTransaction } from "../transactions/transactions.service";
 import { verifyProfileOtp } from "../verification/otp.service";
-import { encrypt, decrypt } from "../../lib/crypto";
+import { cifrar, descifrar } from "../../lib/crypto";
 import { recordAudit } from "../audit/audit.service";
 import type { RequestMeta } from "../../lib/requestMeta";
 
@@ -14,46 +14,46 @@ const STARTER_CREDIT_LINE = 1500;
 
 const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-function randomDigits(n: number) {
+function digitosAleatorios(n: number) {
   let s = "";
   for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 10);
   return s;
 }
 
-function generateAccountNumber() {
-  return `191-${randomDigits(4)}-${randomDigits(4)}`;
+function generarNumeroCuenta() {
+  return `191-${digitosAleatorios(4)}-${digitosAleatorios(4)}`;
 }
 
 // Con la forma visual de un CCI real (banco-agencia-cuenta-dígito
 // verificador), pero no uno calculable de verdad — NovaBank no es una
 // entidad financiera con licencia, así que solo necesita verse bien dentro
 // de su propio libro contable.
-function generateCci() {
-  return `002-191-${randomDigits(11)}-${randomDigits(2)}`;
+function generarCci() {
+  return `002-191-${digitosAleatorios(11)}-${digitosAleatorios(2)}`;
 }
 
-function generateCardNumber() {
-  return `4${randomDigits(15)}`; // Con forma Visa: empieza con 4, 16 dígitos
+function generarNumeroTarjeta() {
+  return `4${digitosAleatorios(15)}`; // Con forma Visa: empieza con 4, 16 dígitos
 }
 
-function generateCvv() {
-  return randomDigits(3);
+function generarCvv() {
+  return digitosAleatorios(3);
 }
 
-function generateCardExpiry() {
-  const now = new Date();
-  const year = (now.getFullYear() + 4) % 100;
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  return `${month}/${String(year).padStart(2, "0")}`;
+function generarVencimientoTarjeta() {
+  const ahora = new Date();
+  const anio = (ahora.getFullYear() + 4) % 100;
+  const mes = String(ahora.getMonth() + 1).padStart(2, "0");
+  return `${mes}/${String(anio).padStart(2, "0")}`;
 }
 
-function formatCutDate(cutDay: number): string {
-  const now = new Date();
-  let month = now.getMonth();
-  if (now.getDate() > cutDay) {
-    month = (month + 1) % 12;
+function formatearFechaCorte(diaCorte: number): string {
+  const ahora = new Date();
+  let mes = ahora.getMonth();
+  if (ahora.getDate() > diaCorte) {
+    mes = (mes + 1) % 12;
   }
-  return `${cutDay} ${MONTHS_ES[month]}`;
+  return `${diaCorte} ${MONTHS_ES[mes]}`;
 }
 
 type Db = typeof prisma | Prisma.TransactionClient;
@@ -62,50 +62,50 @@ type Db = typeof prisma | Prisma.TransactionClient;
 // inserción del usuario — si esto falla, la creación de la cuenta es
 // esencial para que la app funcione, así que todo el registro debe
 // revertirse en vez de dejar un usuario sin cuenta.
-export async function createAccountForUser(db: Db, userId: string) {
-  for (let attempt = 0; attempt < 5; attempt++) {
+export async function crearCuentaParaUsuario(db: Db, idUsuario: string) {
+  for (let intento = 0; intento < 5; intento++) {
     try {
-      const accountNumber = generateAccountNumber();
+      const numeroCuenta = generarNumeroCuenta();
       return await db.account.create({
         data: {
-          userId,
-          accountNumber,
-          cci: generateCci(),
-          cardNumber: encrypt(generateCardNumber()),
-          cardExpiry: generateCardExpiry(),
-          cardCvv: encrypt(generateCvv()),
+          userId: idUsuario,
+          accountNumber: numeroCuenta,
+          cci: generarCci(),
+          cardNumber: cifrar(generarNumeroTarjeta()),
+          cardExpiry: generarVencimientoTarjeta(),
+          cardCvv: cifrar(generarCvv()),
           creditLine: STARTER_CREDIT_LINE,
         },
       });
-    } catch (err) {
-      const isUniqueClash = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
-      if (isUniqueClash && attempt < 4) continue;
-      throw err;
+    } catch (error) {
+      const esChoqueDeUnicidad = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+      if (esChoqueDeUnicidad && intento < 4) continue;
+      throw error;
     }
   }
   throw new HttpError(500, "No se pudo crear la cuenta, intenta de nuevo");
 }
 
-export async function getAccountSummary(userId: string) {
-  const account = await prisma.account.findUnique({ where: { userId } });
-  if (!account) throw new HttpError(404, "Cuenta no encontrada");
+export async function obtenerResumenCuenta(idUsuario: string) {
+  const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
+  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
 
-  const cardDebt = Number(account.cardDebt);
-  const minPayment = cardDebt > 0 ? Math.round(Math.max(cardDebt * 0.05, 20) * 100) / 100 : 0;
+  const deudaTarjeta = Number(cuenta.cardDebt);
+  const pagoMinimo = deudaTarjeta > 0 ? Math.round(Math.max(deudaTarjeta * 0.05, 20) * 100) / 100 : 0;
 
   return {
-    accountNumber: account.accountNumber,
-    cci: account.cci,
-    cardNumber: decrypt(account.cardNumber),
-    cardExpiry: account.cardExpiry,
-    availableBalance: Number(account.availableBalance),
-    heldBalance: Number(account.heldBalance),
-    creditLine: Number(account.creditLine),
-    cardDebt,
-    minPayment,
-    cutDate: formatCutDate(account.cutDay),
-    cardBlocked: account.cardBlocked,
-    memberSince: account.createdAt,
+    accountNumber: cuenta.accountNumber,
+    cci: cuenta.cci,
+    cardNumber: descifrar(cuenta.cardNumber),
+    cardExpiry: cuenta.cardExpiry,
+    availableBalance: Number(cuenta.availableBalance),
+    heldBalance: Number(cuenta.heldBalance),
+    creditLine: Number(cuenta.creditLine),
+    cardDebt: deudaTarjeta,
+    minPayment: pagoMinimo,
+    cutDate: formatearFechaCorte(cuenta.cutDay),
+    cardBlocked: cuenta.cardBlocked,
+    memberSince: cuenta.createdAt,
   };
 }
 
@@ -113,74 +113,74 @@ export async function getAccountSummary(userId: string) {
 // perfil (ver profile.service.ts) — el CVV solo se puede leer después de
 // probar control sobre el correo verificado de la cuenta, la misma barrera
 // que cambiar la contraseña.
-export async function revealCvv(userId: string, otpCode: string, meta?: RequestMeta) {
-  const [user, account] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
-    prisma.account.findUnique({ where: { userId } }),
+export async function revelarCvv(idUsuario: string, codigoOtp: string, metaSolicitud?: RequestMeta) {
+  const [usuario, cuenta] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: idUsuario } }),
+    prisma.account.findUnique({ where: { userId: idUsuario } }),
   ]);
-  if (!account) throw new HttpError(404, "Cuenta no encontrada");
+  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
 
-  await verifyProfileOtp(user.email, otpCode);
+  await verifyProfileOtp(usuario.email, codigoOtp);
 
-  await recordAudit({ userId, category: "TARJETA", action: "cvv_revealed", meta });
+  await recordAudit({ userId: idUsuario, category: "TARJETA", action: "cvv_revealed", meta: metaSolicitud });
 
-  return { cvv: decrypt(account.cardCvv) };
+  return { cvv: descifrar(cuenta.cardCvv) };
 }
 
-export async function setCardBlocked(userId: string, blocked: boolean, meta?: RequestMeta) {
-  const account = await prisma.account.findUnique({ where: { userId } });
-  if (!account) throw new HttpError(404, "Cuenta no encontrada");
-  const updated = await prisma.account.update({ where: { userId }, data: { cardBlocked: blocked } });
+export async function establecerBloqueoTarjeta(idUsuario: string, bloqueada: boolean, metaSolicitud?: RequestMeta) {
+  const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
+  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  const actualizada = await prisma.account.update({ where: { userId: idUsuario }, data: { cardBlocked: bloqueada } });
   await recordAudit({
-    userId,
+    userId: idUsuario,
     category: "TARJETA",
-    action: blocked ? "card_blocked" : "card_unblocked",
-    meta,
+    action: bloqueada ? "card_blocked" : "card_unblocked",
+    meta: metaSolicitud,
   });
-  return updated.cardBlocked;
+  return actualizada.cardBlocked;
 }
 
-export async function payCard(userId: string, amount: number, meta?: RequestMeta) {
-  const account = await prisma.account.findUnique({ where: { userId } });
-  if (!account) throw new HttpError(404, "Cuenta no encontrada");
+export async function pagarTarjeta(idUsuario: string, monto: number, metaSolicitud?: RequestMeta) {
+  const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
+  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
 
-  if (amount <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
-  const cardDebt = Number(account.cardDebt);
-  if (amount > cardDebt) throw new HttpError(400, "El monto supera tu deuda actual");
-  if (Number(account.availableBalance) < amount) {
+  if (monto <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
+  const deudaTarjeta = Number(cuenta.cardDebt);
+  if (monto > deudaTarjeta) throw new HttpError(400, "El monto supera tu deuda actual");
+  if (Number(cuenta.availableBalance) < monto) {
     await recordAudit({
-      userId,
+      userId: idUsuario,
       category: "TARJETA",
       action: "card_payment_failed_insufficient_balance",
       success: false,
-      metadata: { amount },
-      meta,
+      metadata: { amount: monto },
+      meta: metaSolicitud,
     });
     throw new HttpError(400, "Saldo insuficiente");
   }
 
   await prisma.$transaction(async (tx) => {
     await tx.account.update({
-      where: { userId },
-      data: { availableBalance: { decrement: amount }, cardDebt: { decrement: amount } },
+      where: { userId: idUsuario },
+      data: { availableBalance: { decrement: monto }, cardDebt: { decrement: monto } },
     });
     await recordTransaction(
       tx,
-      userId,
-      account.id,
+      idUsuario,
+      cuenta.id,
       {
         kind: "DEBIT",
         category: "PAGO_TARJETA",
         name: "Pago de tarjeta",
         meta: "Pago de deuda de tarjeta de crédito",
-        amount,
+        amount: monto,
         icon: "credit-card",
         iconBg: "#EDF2F8",
         iconFg: "#133A63",
       },
       {
         title: "Pago de tarjeta realizado",
-        body: `Pagaste S/ ${amount.toFixed(2)} de tu tarjeta de crédito.`,
+        body: `Pagaste S/ ${monto.toFixed(2)} de tu tarjeta de crédito.`,
         icon: "credit-card",
         iconBg: "#EDF2F8",
         iconFg: "#133A63",
@@ -188,7 +188,7 @@ export async function payCard(userId: string, amount: number, meta?: RequestMeta
     );
   });
 
-  await recordAudit({ userId, category: "TARJETA", action: "card_payment_completed", metadata: { amount }, meta });
+  await recordAudit({ userId: idUsuario, category: "TARJETA", action: "card_payment_completed", metadata: { amount: monto }, meta: metaSolicitud });
 
-  return getAccountSummary(userId);
+  return obtenerResumenCuenta(idUsuario);
 }

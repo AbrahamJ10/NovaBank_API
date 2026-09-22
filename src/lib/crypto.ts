@@ -10,18 +10,18 @@ import { env } from "../config/env";
 const ALGORITHM = "aes-256-gcm";
 const key = Buffer.from(env.ENCRYPTION_KEY, "hex");
 
-export function encrypt(plainText: string): string {
+export function cifrar(textoPlano: string): string {
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  const ciphertext = Buffer.concat([cipher.update(plainText, "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return [iv.toString("base64"), authTag.toString("base64"), ciphertext.toString("base64")].join(".");
+  const cifrador = crypto.createCipheriv(ALGORITHM, key, iv);
+  const textoCifrado = Buffer.concat([cifrador.update(textoPlano, "utf8"), cifrador.final()]);
+  const authTag = cifrador.getAuthTag();
+  return [iv.toString("base64"), authTag.toString("base64"), textoCifrado.toString("base64")].join(".");
 }
 
-export function decrypt(payload: string): string {
+export function descifrar(payload: string): string {
   const [ivB64, tagB64, dataB64] = payload.split(".");
-  if (!ivB64 || !tagB64 || !dataB64) throw new Error("Invalid encrypted payload format");
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivB64, "base64"));
-  decipher.setAuthTag(Buffer.from(tagB64, "base64"));
-  return Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]).toString("utf8");
+  if (!ivB64 || !tagB64 || !dataB64) throw new Error("Formato de payload cifrado inválido");
+  const descifrador = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivB64, "base64"));
+  descifrador.setAuthTag(Buffer.from(tagB64, "base64"));
+  return Buffer.concat([descifrador.update(Buffer.from(dataB64, "base64")), descifrador.final()]).toString("utf8");
 }

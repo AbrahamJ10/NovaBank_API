@@ -1,34 +1,34 @@
 import { Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
-import * as accountService from "./account.service";
+import * as servicioCuenta from "./account.service";
 import { getRequestMeta } from "../../lib/requestMeta";
 
-export async function getAccountHandler(req: AuthenticatedRequest, res: Response) {
-  const summary = await accountService.getAccountSummary(req.user!.id);
-  res.json(summary);
+export async function manejadorObtenerCuenta(peticion: AuthenticatedRequest, respuesta: Response) {
+  const resumen = await servicioCuenta.obtenerResumenCuenta(peticion.user!.id);
+  respuesta.json(resumen);
 }
 
-const cardBlockSchema = z.object({ blocked: z.boolean() });
+const esquemaBloqueoTarjeta = z.object({ blocked: z.boolean() });
 
-export async function setCardBlockedHandler(req: AuthenticatedRequest, res: Response) {
-  const { blocked } = cardBlockSchema.parse(req.body);
-  const cardBlocked = await accountService.setCardBlocked(req.user!.id, blocked, getRequestMeta(req));
-  res.json({ cardBlocked });
+export async function manejadorBloqueoTarjeta(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { blocked } = esquemaBloqueoTarjeta.parse(peticion.body);
+  const tarjetaBloqueada = await servicioCuenta.establecerBloqueoTarjeta(peticion.user!.id, blocked, getRequestMeta(peticion));
+  respuesta.json({ cardBlocked: tarjetaBloqueada });
 }
 
-const payCardSchema = z.object({ amount: z.number().positive() });
+const esquemaPagoTarjeta = z.object({ amount: z.number().positive() });
 
-export async function payCardHandler(req: AuthenticatedRequest, res: Response) {
-  const { amount } = payCardSchema.parse(req.body);
-  const summary = await accountService.payCard(req.user!.id, amount, getRequestMeta(req));
-  res.json(summary);
+export async function manejadorPagoTarjeta(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { amount } = esquemaPagoTarjeta.parse(peticion.body);
+  const resumen = await servicioCuenta.pagarTarjeta(peticion.user!.id, amount, getRequestMeta(peticion));
+  respuesta.json(resumen);
 }
 
-const revealCvvSchema = z.object({ otpCode: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos") });
+const esquemaRevelarCvv = z.object({ otpCode: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos") });
 
-export async function revealCvvHandler(req: AuthenticatedRequest, res: Response) {
-  const { otpCode } = revealCvvSchema.parse(req.body);
-  const result = await accountService.revealCvv(req.user!.id, otpCode, getRequestMeta(req));
-  res.json(result);
+export async function manejadorRevelarCvv(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { otpCode } = esquemaRevelarCvv.parse(peticion.body);
+  const resultado = await servicioCuenta.revelarCvv(peticion.user!.id, otpCode, getRequestMeta(peticion));
+  respuesta.json(resultado);
 }

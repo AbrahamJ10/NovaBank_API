@@ -1,42 +1,42 @@
 import { Response, Request } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
-import * as billsService from "./bills.service";
-import { affiliateSchema } from "./bills.validators";
+import * as servicioRecibos from "./bills.service";
+import { esquemaAfiliacion } from "./bills.validators";
 import { getRequestMeta } from "../../lib/requestMeta";
 
-export async function getCatalogHandler(_req: Request, res: Response) {
-  const items = await billsService.getCatalog();
-  res.json({ items });
+export async function manejadorObtenerCatalogo(_peticion: Request, respuesta: Response) {
+  const items = await servicioRecibos.obtenerCatalogo();
+  respuesta.json({ items });
 }
 
-export async function listBillsHandler(req: AuthenticatedRequest, res: Response) {
-  const items = await billsService.listBills(req.user!.id);
-  res.json({ items });
+export async function manejadorListarRecibos(peticion: AuthenticatedRequest, respuesta: Response) {
+  const items = await servicioRecibos.listarRecibos(peticion.user!.id);
+  respuesta.json({ items });
 }
 
-export async function affiliateHandler(req: AuthenticatedRequest, res: Response) {
-  const input = affiliateSchema.parse(req.body);
-  const bill = await billsService.affiliateBill(req.user!.id, input.billerKey, input.supplyNumber, getRequestMeta(req));
-  res.status(201).json(bill);
+export async function manejadorAfiliar(peticion: AuthenticatedRequest, respuesta: Response) {
+  const entrada = esquemaAfiliacion.parse(peticion.body);
+  const recibo = await servicioRecibos.afiliarServicio(peticion.user!.id, entrada.billerKey, entrada.supplyNumber, getRequestMeta(peticion));
+  respuesta.status(201).json(recibo);
 }
 
-const paramsSchema = z.object({ id: z.string().uuid() });
+const esquemaParametros = z.object({ id: z.string().uuid() });
 
-export async function payBillHandler(req: AuthenticatedRequest, res: Response) {
-  const { id } = paramsSchema.parse(req.params);
-  await billsService.payBill(req.user!.id, id, getRequestMeta(req));
-  res.status(204).send();
+export async function manejadorPagarRecibo(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { id } = esquemaParametros.parse(peticion.params);
+  await servicioRecibos.pagarRecibo(peticion.user!.id, id, getRequestMeta(peticion));
+  respuesta.status(204).send();
 }
 
-export async function suspendBillHandler(req: AuthenticatedRequest, res: Response) {
-  const { id } = paramsSchema.parse(req.params);
-  const bill = await billsService.suspendBill(req.user!.id, id, getRequestMeta(req));
-  res.json(bill);
+export async function manejadorSuspenderServicio(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { id } = esquemaParametros.parse(peticion.params);
+  const recibo = await servicioRecibos.suspenderServicio(peticion.user!.id, id, getRequestMeta(peticion));
+  respuesta.json(recibo);
 }
 
-export async function resumeBillHandler(req: AuthenticatedRequest, res: Response) {
-  const { id } = paramsSchema.parse(req.params);
-  const bill = await billsService.resumeBill(req.user!.id, id, getRequestMeta(req));
-  res.json(bill);
+export async function manejadorReanudarServicio(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { id } = esquemaParametros.parse(peticion.params);
+  const recibo = await servicioRecibos.reanudarServicio(peticion.user!.id, id, getRequestMeta(peticion));
+  respuesta.json(recibo);
 }

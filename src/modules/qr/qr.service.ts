@@ -1,48 +1,48 @@
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
 import { recordTransaction } from "../transactions/transactions.service";
-import type { PayQrInput } from "./qr.validators";
+import type { EntradaPagoQr } from "./qr.validators";
 import { recordAudit } from "../audit/audit.service";
 import type { RequestMeta } from "../../lib/requestMeta";
 
-export async function payQr(userId: string, input: PayQrInput, meta?: RequestMeta) {
-  const [account, user] = await Promise.all([
-    prisma.account.findUnique({ where: { userId } }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId } }),
+export async function pagarQr(idUsuario: string, entrada: EntradaPagoQr, metaSolicitud?: RequestMeta) {
+  const [cuenta, usuario] = await Promise.all([
+    prisma.account.findUnique({ where: { userId: idUsuario } }),
+    prisma.user.findUniqueOrThrow({ where: { id: idUsuario } }),
   ]);
-  if (!account) throw new HttpError(404, "Cuenta no encontrada");
-  if (Number(account.availableBalance) < input.amount) {
+  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (Number(cuenta.availableBalance) < entrada.amount) {
     await recordAudit({
-      userId,
+      userId: idUsuario,
       category: "QR",
       action: "qr_payment_failed_insufficient_balance",
       success: false,
-      metadata: { merchant: input.merchant, amount: input.amount },
-      meta,
+      metadata: { merchant: entrada.merchant, amount: entrada.amount },
+      meta: metaSolicitud,
     });
     throw new HttpError(400, "Saldo insuficiente");
   }
 
-  const transaction = await prisma.$transaction(async (tx) => {
-    await tx.account.update({ where: { userId }, data: { availableBalance: { decrement: input.amount } } });
+  const transaccion = await prisma.$transaction(async (tx) => {
+    await tx.account.update({ where: { userId: idUsuario }, data: { availableBalance: { decrement: entrada.amount } } });
     return recordTransaction(
       tx,
-      userId,
-      account.id,
+      idUsuario,
+      cuenta.id,
       {
         kind: "DEBIT",
         category: "QR",
-        name: input.merchant,
+        name: entrada.merchant,
         meta: "Pago QR",
-        amount: input.amount,
+        amount: entrada.amount,
         icon: "qr-code-2",
         iconBg: "#FFF1E8",
         iconFg: "#D2691E",
       },
-      user.alertPurchase
+      usuario.alertPurchase
         ? {
             title: "Pago con QR",
-            body: `Pagaste S/ ${input.amount.toFixed(2)} a ${input.merchant}.`,
+            body: `Pagaste S/ ${entrada.amount.toFixed(2)} a ${entrada.merchant}.`,
             icon: "qr-code-2",
             iconBg: "#FFF1E8",
             iconFg: "#D2691E",
@@ -52,12 +52,12 @@ export async function payQr(userId: string, input: PayQrInput, meta?: RequestMet
   });
 
   await recordAudit({
-    userId,
+    userId: idUsuario,
     category: "QR",
     action: "qr_payment_completed",
-    metadata: { merchant: input.merchant, amount: input.amount },
-    meta,
+    metadata: { merchant: entrada.merchant, amount: entrada.amount },
+    meta: metaSolicitud,
   });
 
-  return { transactionId: transaction.id, merchant: input.merchant, amount: input.amount, createdAt: transaction.createdAt };
+  return { transactionId: transaccion.id, merchant: entrada.merchant, amount: entrada.amount, createdAt: transaccion.createdAt };
 }
