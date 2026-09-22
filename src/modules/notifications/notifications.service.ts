@@ -11,9 +11,10 @@ export type NotificationInput = {
   iconFg: string;
 };
 
-// Called from wherever something notification-worthy happens (a real
-// transaction landing, a security event) — takes a db/tx client so it can
-// be created atomically alongside whatever triggered it.
+// Se llama desde donde sea que pase algo digno de notificar (llega una
+// transacción real, se dispara un evento de seguridad) — recibe un cliente
+// db/tx para poder crearse de forma atómica junto con lo que la haya
+// disparado.
 export async function createNotification(db: Db, userId: string, input: NotificationInput) {
   return db.notification.create({ data: { userId, ...input } });
 }

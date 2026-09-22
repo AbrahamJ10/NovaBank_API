@@ -15,14 +15,15 @@ export type NewTransactionInput = {
   iconFg: string;
 };
 
-// The one place a transaction gets written — every future money-moving
-// endpoint (transfer, bill pay, QR, withdrawal) should call this so the
-// ledger row and its notification are created together, atomically, inside
-// the same db/tx client as the balance update that caused it. The ledger
-// row is never optional; `notification` is — callers whose category is
-// gated by a user notification preference (see User.alertPurchase/
-// alertWithdraw) pass null to skip it there instead of unconditionally
-// creating one, while the transaction itself still always records.
+// El único lugar donde se escribe una transacción — todo endpoint futuro
+// que mueva dinero (transferencia, pago de recibo, QR, retiro) debe llamar
+// a esto para que la fila del historial y su notificación se creen juntas,
+// de forma atómica, dentro del mismo cliente db/tx que el cambio de saldo
+// que las causó. La fila del historial nunca es opcional; `notification`
+// sí lo es — quien llama y cuya categoría está controlada por una
+// preferencia de notificación del usuario (ver User.alertPurchase/
+// alertWithdraw) pasa null para omitirla ahí, mientras que la transacción
+// en sí siempre se registra.
 export async function recordTransaction(
   db: Db,
   userId: string,

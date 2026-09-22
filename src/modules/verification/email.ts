@@ -1,12 +1,13 @@
 import { env } from "../../config/env";
 import { HttpError } from "../../middleware/errorHandler";
 
-// Brevo's transactional email HTTP API (https://api.brevo.com) — chosen
-// over raw SMTP (Gmail, etc.) because outbound SMTP ports are unreliable
-// or blocked on Render's free tier; this rides plain HTTPS instead. Only
-// a single verified sender email is required (no domain purchase) and,
-// once verified, it can send to any recipient.
-export type EmailAttachment = { name: string; content: string }; // content is base64
+// La API HTTP de correo transaccional de Brevo (https://api.brevo.com) —
+// elegida en vez de SMTP directo (Gmail, etc.) porque los puertos SMTP de
+// salida no son confiables o están bloqueados en el plan gratuito de
+// Render; esto usa HTTPS normal en su lugar. Solo se necesita un correo de
+// remitente verificado (sin comprar dominio) y, una vez verificado, puede
+// enviar a cualquier destinatario.
+export type EmailAttachment = { name: string; content: string }; // content va en base64
 
 export async function sendEmail(to: string, subject: string, html: string, attachments?: EmailAttachment[]): Promise<void> {
   if (env.BREVO_API_KEY && env.BREVO_FROM_EMAIL) {

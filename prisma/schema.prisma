@@ -17,16 +17,16 @@ model User {
 
   isActive  Boolean  @default(true) @map("esta_activo")
 
-  // Brute-force / account lockout
+  // Bloqueo de cuenta por fuerza bruta
   failedLoginAttempts Int       @default(0) @map("intentos_fallidos")
   lockedUntil         DateTime? @map("bloqueado_hasta")
 
-  // Notification preferences — checked at each call site before creating a
-  // Notification row (alertPurchase in qr.service.payQr, alertWithdraw in
-  // withdrawals.service create/cancelWithdrawal, alertLogin in
-  // auth.service.registerSuccess); alertPromo has no promo feature yet to
-  // gate. The underlying Transaction/ledger row is never gated, only the
-  // notification.
+  // Preferencias de notificación — se revisan en cada punto de uso antes de
+  // crear una fila de Notification (alertPurchase en qr.service.payQr,
+  // alertWithdraw en withdrawals.service create/cancelWithdrawal, alertLogin
+  // en auth.service.registerSuccess); alertPromo todavía no tiene ninguna
+  // función de promociones que controlar. La transacción del historial nunca
+  // se filtra, solo la notificación.
   alertPurchase Boolean @default(true)  @map("alerta_compra")
   alertWithdraw Boolean @default(true)  @map("alerta_retiro")
   alertLogin    Boolean @default(true)  @map("alerta_login")
@@ -53,7 +53,7 @@ model RefreshToken {
   userId     String    @map("usuario_id")
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Never store the raw token, only a hash of it
+  // Nunca se guarda el token en crudo, solo su hash
   tokenHash  String    @unique @map("token_hash")
 
   userAgent  String?   @map("agente_usuario")
@@ -107,7 +107,7 @@ model EmailOtp {
   email      String     @map("correo")
   purpose    OtpPurpose @map("proposito")
 
-  // Never store the raw code, only a hash of it
+  // Nunca se guarda el código en crudo, solo su hash
   codeHash   String     @map("codigo_hash")
   attempts   Int        @default(0) @map("intentos")
 
@@ -119,10 +119,11 @@ model EmailOtp {
   @@map("codigos_verificacion")
 }
 
-// Reference photos for biometric Face ID login — captured once during
-// registration (with explicit user consent) and stored in Cloudinary; only
-// the resulting URLs live here. Every later Face ID login compares a fresh
-// selfie against these instead of being stored itself.
+// Fotos de referencia para el login biométrico con Face ID — se capturan una
+// sola vez durante el registro (con consentimiento explícito del usuario) y
+// se guardan en Cloudinary; aquí solo viven las URLs resultantes. Cada login
+// con Face ID posterior compara una selfie nueva contra estas, en vez de
+// guardar la selfie en sí.
 model FaceReference {
   id              String   @id @default(uuid())
   userId          String   @unique @map("usuario_id")
@@ -135,9 +136,10 @@ model FaceReference {
   @@map("referencias_faciales")
 }
 
-// Audit trail for the one-time registration face-match check — the photos
-// used there are compared in-memory against Face++ and discarded (unlike
-// FaceReference above, which is a deliberate saved copy for later logins).
+// Registro de auditoría de la verificación facial única del registro — las
+// fotos usadas ahí se comparan en memoria contra Face++ y se descartan (a
+// diferencia de FaceReference arriba, que es una copia guardada a propósito
+// para logins posteriores).
 model FaceVerificationEvent {
   id         String   @id @default(uuid())
   dni        String
@@ -151,11 +153,12 @@ model FaceVerificationEvent {
   @@map("eventos_verificacion_facial")
 }
 
-// The real internal ledger backing the Home screen — balances and account
-// numbers live here, generated once at registration. This never moves real
-// money through any bank; it's a self-contained ledger inside NovaBank
-// itself (see conversation: real interbank transfers require an SBS
-// license, which is out of reach for a personal project).
+// El libro contable interno real detrás de la pantalla de Inicio — aquí
+// viven los saldos y números de cuenta, generados una sola vez en el
+// registro. Esto nunca mueve dinero real a través de ningún banco; es un
+// libro contable autocontenido dentro de NovaBank mismo (las transferencias
+// interbancarias reales requieren una licencia de la SBS, fuera del alcance
+// de un proyecto personal).
 model Account {
   id               String   @id @default(uuid())
   userId           String   @unique @map("usuario_id")
@@ -174,10 +177,11 @@ model Account {
   cutDay           Int      @default(28) @map("dia_corte")
   cardBlocked      Boolean  @default(false) @map("tarjeta_bloqueada")
 
-  // Spending limits/geo-controls. limitOnline is enforced on transfers (the
-  // one real money-out path); limitAtm/geo toggles are stored for the
-  // Limits screen but not enforced yet — cardless withdrawal isn't wired to
-  // the real ledger.
+  // Límites de gasto/controles geográficos. limitOnline se aplica en las
+  // transferencias (la única salida real de dinero); los interruptores de
+  // limitAtm/geo se guardan para la pantalla de Límites pero aún no se
+  // aplican — el retiro sin tarjeta todavía no está conectado al libro
+  // contable real.
   limitOnline      Decimal  @default(1500) @db.Decimal(12, 2) @map("limite_en_linea")
   limitAtm         Decimal  @default(700)  @db.Decimal(12, 2) @map("limite_cajero")
   geoPeru          Boolean  @default(true)  @map("geo_peru")
@@ -231,10 +235,10 @@ model Transaction {
   @@map("transacciones")
 }
 
-// Real notifications tied to the account holder — created server-side
-// whenever something notification-worthy happens (a transaction lands,
-// a security event fires). Tied to the user rather than the account
-// since not every notification is transaction-shaped.
+// Notificaciones reales asociadas al titular de la cuenta — se crean del
+// lado del servidor cada vez que pasa algo digno de notificar (llega una
+// transacción, se dispara un evento de seguridad). Están ligadas al usuario
+// y no a la cuenta porque no toda notificación tiene forma de transacción.
 model Notification {
   id        String   @id @default(uuid())
   userId    String   @map("usuario_id")
@@ -253,9 +257,10 @@ model Notification {
   @@map("notificaciones")
 }
 
-// A saved transfer beneficiary. "inactive" mirrors a real bank's own
-// rejection reasons (closed/frozen destination account) — the transfer
-// endpoint refuses to move money to one instead of silently succeeding.
+// Un beneficiario de transferencia guardado. "inactive" refleja las razones
+// de rechazo reales de un banco (cuenta destino cerrada/congelada) — el
+// endpoint de transferencia se niega a mover dinero hacia uno en vez de
+// tener éxito en silencio.
 model Payee {
   id            String   @id @default(uuid())
   userId        String   @map("usuario_id")
@@ -287,9 +292,9 @@ enum BillerCategory {
   @@map("categoria_proveedor")
 }
 
-// The real directory of billers a user can affiliate a service with (see
-// Bill below) — a global reference table, not per-user data, seeded once
-// via prisma/seed.ts.
+// El directorio real de proveedores de servicio a los que un usuario puede
+// afiliar un servicio (ver Bill abajo) — una tabla de referencia global, no
+// datos por usuario, sembrada una sola vez a través de prisma/seed.ts.
 model Biller {
   id               String         @id @default(uuid())
   key              String         @unique @map("clave")
@@ -309,11 +314,12 @@ model Biller {
   @@map("proveedores_servicio")
 }
 
-// One row = one affiliated service (biller + supply/line number) AND its
-// current billing cycle. Paying it just flips paid=true — the next cycle
-// isn't a new row; listBills() lazily rolls a stale paid row back to
-// paid=false once its cycle's elapsed, same effect as a real recurring
-// bill without needing a cron job.
+// Una fila = un servicio afiliado (proveedor + número de suministro/línea) Y
+// su ciclo de facturación actual. Pagarlo solo cambia paid=true — el
+// siguiente ciclo no es una fila nueva; listBills() de forma perezosa
+// regresa una fila pagada y vencida a paid=false una vez que su ciclo
+// terminó, el mismo efecto que un recibo recurrente real sin necesitar un
+// cron job.
 model Bill {
   id           String   @id @default(uuid())
   userId       String   @map("usuario_id")
@@ -354,21 +360,22 @@ enum AuditCategory {
   @@map("categoria_auditoria")
 }
 
-// The full interaction trail: every security/money-moving action is written
-// here server-side (the service that performs it also calls
-// audit.service.recordAudit, see e.g. transfers.service.executeTransfer);
-// pure client-side navigation (screen views, button taps with no backend
-// call of their own) is reported in batches by the app itself through
-// POST /api/audit/events. Deliberately generic (action + metadata JSON)
-// instead of one column per event type, since the requested scope spans
-// everything from a button tap to a completed transfer — category narrows
-// it enough to query efficiently, metadata carries whatever's specific to
-// that action (target payee, amount, screen name, biller key, etc).
+// El rastro completo de interacción: toda acción de seguridad o movimiento
+// de dinero se escribe aquí del lado del servidor (el servicio que la
+// ejecuta también llama a audit.service.recordAudit, ver por ejemplo
+// transfers.service.executeTransfer); la navegación puramente del lado del
+// cliente (vistas de pantalla, toques de botón sin una llamada propia al
+// backend) la reporta la app en lotes a través de POST /api/audit/events.
+// A propósito es genérico (action + metadata en JSON) en vez de una columna
+// por tipo de evento, ya que el alcance pedido abarca desde un toque de
+// botón hasta una transferencia completada — category acota lo suficiente
+// para consultar con eficiencia, metadata lleva lo específico de cada acción
+// (beneficiario, monto, nombre de pantalla, clave del proveedor, etc).
 //
-// country/city are best-effort from the request IP (see lib/geo.ts) — that
-// gives country/city-level location, not a precise Peruvian ubigeo
-// (department/province/district), which would need the app to request GPS
-// permission and isn't implemented.
+// country/city son un cálculo aproximado a partir de la IP de la solicitud
+// (ver lib/requestMeta.ts) — eso da una ubicación a nivel país/ciudad, no un
+// ubigeo peruano preciso (departamento/provincia/distrito), que
+// necesitaría que la app pida permiso de GPS y no está implementado.
 model AuditLog {
   id          String        @id @default(uuid())
   userId      String?       @map("usuario_id")
@@ -398,10 +405,11 @@ model AuditLog {
   @@map("auditoria")
 }
 
-// A cardless-withdrawal code. The amount is debited immediately when the
-// code is generated (there's no real ATM network here to redeem against
-// later) — cancelling before it expires refunds it with a real credit
-// transaction, same as reversing any other real debit.
+// Una clave de retiro sin tarjeta. El monto se debita de inmediato cuando se
+// genera la clave (aquí no hay una red de cajeros real contra la cual
+// canjearla después) — cancelarla antes de que expire la reembolsa con una
+// transacción de crédito real, igual que revertir cualquier otro débito
+// real.
 model Withdrawal {
   id         String    @id @default(uuid())
   userId     String    @map("usuario_id")

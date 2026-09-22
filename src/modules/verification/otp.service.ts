@@ -23,7 +23,7 @@ const EMAIL_COPY: Record<OtpPurpose, { subject: string; heading: string }> = {
 };
 
 async function requestOtp(email: string, purpose: OtpPurpose): Promise<void> {
-  // Only the most recently requested code should ever be valid.
+  // Solo el código solicitado más recientemente debe ser válido.
   await prisma.emailOtp.updateMany({
     where: { email, purpose, consumedAt: null },
     data: { consumedAt: new Date() },

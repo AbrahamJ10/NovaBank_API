@@ -8,9 +8,10 @@ export const registerSchema = z.object({
   phone: z.string().trim().min(6).max(20).optional(),
   dni: z.string().trim().min(6).max(15).optional(),
   otpCode: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos"),
-  // Face-reference photos from the registration verification step, saved so
-  // a later Face ID login has something real to compare against. Optional —
-  // registration still works without them, just without Face ID login after.
+  // Fotos de referencia facial del paso de verificación del registro,
+  // guardadas para que un login con Face ID posterior tenga algo real
+  // contra qué comparar. Opcional — el registro igual funciona sin ellas,
+  // solo que sin login con Face ID después.
   dniPhoto: z.string().min(100).optional(),
   selfie: z.string().min(100).optional(),
 });

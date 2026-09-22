@@ -1,8 +1,9 @@
 import { z } from "zod";
 
-// Single source of truth for password strength — every place a user sets a
-// password (register, password-reset, change-password from Profile) must
-// enforce the exact same rule, or one path ends up weaker than the others.
+// Única fuente de verdad para la fortaleza de la contraseña — todo lugar
+// donde un usuario establece una contraseña (registro, restablecer
+// contraseña, cambiar contraseña desde Perfil) debe aplicar exactamente la
+// misma regla, o un camino termina siendo más débil que los demás.
 export const passwordSchema = z
   .string()
   .min(10, "La contraseña debe tener al menos 10 caracteres")

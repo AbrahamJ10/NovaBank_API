@@ -18,11 +18,12 @@ function setImageField(form: URLSearchParams, index: 1 | 2, image: ImageInput) {
   }
 }
 
-// Compares two faces (each given as base64 or a hosted URL) using Face++
-// (facepp.com) — a generic face-comparison model, not an official RENIEC
-// biometric match (that access tier isn't sold to individual developers).
-// Confidence is checked against Face++'s own "1e-4" false-accept-rate
-// threshold, their recommended bar for security-sensitive use cases.
+// Compara dos rostros (cada uno dado como base64 o una URL alojada) usando
+// Face++ (facepp.com) — un modelo genérico de comparación facial, no una
+// coincidencia biométrica oficial de RENIEC (ese nivel de acceso no se
+// vende a desarrolladores individuales). La confianza se compara contra el
+// umbral propio de Face++ de tasa de falsos positivos "1e-4", su barra
+// recomendada para casos de uso sensibles a la seguridad.
 export async function compareFaces(image1: ImageInput, image2: ImageInput): Promise<FaceCompareResult> {
   if (!env.FACEPP_API_KEY || !env.FACEPP_API_SECRET) {
     throw new HttpError(503, "El servicio de verificación facial no está configurado");

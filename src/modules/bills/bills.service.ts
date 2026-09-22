@@ -7,10 +7,11 @@ import type { RequestMeta } from "../../lib/requestMeta";
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
-// The catalog itself lives in the "proveedores_servicio" table (see
-// prisma/seed.ts for the ~50 real Peruvian billers it's seeded with) —
-// this module only shapes it for the API and derives simulated bill state,
-// there's no real integration behind any one of them.
+// El catálogo en sí vive en la tabla "proveedores_servicio" (ver
+// prisma/seed.ts para las ~50 empresas peruanas reales con las que se
+// siembra) — este módulo solo le da forma para la API y deriva el estado
+// simulado de los recibos, no hay ninguna integración real detrás de
+// ninguna de ellas.
 export async function getCatalog() {
   const billers = await prisma.biller.findMany({ where: { active: true }, orderBy: [{ category: "asc" }, { name: "asc" }] });
   return billers.map((b) => ({ ...b, category: b.category.toLowerCase() }));
@@ -35,20 +36,21 @@ function hashString(s: string): number {
   return h;
 }
 
-// Deterministic per (billerKey, supplyNumber[, cycle salt]) so looking the
-// same account up twice returns the same answer, but different accounts —
-// or a later cycle of the same one — get a different plausible bill.
+// Determinista por (billerKey, supplyNumber[, salto de ciclo]) para que
+// buscar la misma cuenta dos veces devuelva la misma respuesta, pero cuentas
+// distintas — o un ciclo posterior de la misma — reciban un recibo distinto
+// y verosímil.
 function deriveBillState(billerKey: string, seed: string) {
   const h = hashString(`${billerKey}:${seed}`);
-  const upToDate = h % 5 === 0; // ~20% of lookups have nothing currently due
+  const upToDate = h % 5 === 0; // ~20% de las consultas no tienen nada pendiente
   const amount = Math.round((25 + (h % 20000) / 100) * 100) / 100; // S/ 25.00–224.99
-  const dueInDays = 5 + (h % 21); // 5–25 days out
+  const dueInDays = 5 + (h % 21); // 5–25 días de plazo
   return { upToDate, amount, dueInDays };
 }
 
-// Prisma's Decimal serializes to a string by default — this keeps every
-// bill response a real JS number, the same fix already applied to
-// transactions/account amounts.
+// El Decimal de Prisma se serializa como string por defecto — esto
+// mantiene cada respuesta de recibo como un number real de JS, la misma
+// corrección ya aplicada a los montos de transacciones/cuenta.
 function toPublicBill<T extends { amount: Prisma.Decimal }>(bill: T): Omit<T, "amount"> & { amount: number } {
   return { ...bill, amount: Number(bill.amount) };
 }
@@ -72,13 +74,13 @@ async function createAffiliation(db: Db, userId: string, biller: { key: string; 
   });
 }
 
-// A brand-new account has no real billing history, so it starts with a
-// few illustrative affiliated services — same role as seedDefaultPayees
-// for transfers.
+// Una cuenta recién creada no tiene historial real de facturación, así que
+// empieza con algunos servicios afiliados a modo de ejemplo — el mismo rol
+// que seedDefaultPayees cumple para las transferencias.
 export async function seedDefaultBills(db: Db, userId: string) {
   for (const s of STARTER_AFFILIATIONS) {
     const biller = await findBiller(s.billerKey);
-    if (!biller) continue; // catalog not seeded yet in this environment — skip rather than fail registration
+    if (!biller) continue; // el catálogo aún no está sembrado en este entorno — se omite en vez de fallar el registro
     await createAffiliation(db, userId, biller, s.supplyNumber);
   }
 }
@@ -93,7 +95,7 @@ export async function affiliateBill(userId: string, billerKey: string, supplyNum
   const existing = await prisma.bill.findUnique({
     where: { userId_billerKey_supplyNumber: { userId, billerKey, supplyNumber } },
   });
-  if (existing) return toPublicBill(existing); // already affiliated — re-lookup is idempotent
+  if (existing) return toPublicBill(existing); // ya estaba afiliado — volver a consultarlo es idempotente
 
   const created = await createAffiliation(prisma, userId, biller, supplyNumber);
   await recordAudit({
@@ -106,16 +108,17 @@ export async function affiliateBill(userId: string, billerKey: string, supplyNum
   return toPublicBill(created);
 }
 
-// Rolls any affiliated service whose last payment (or "up to date" lookup)
-// is more than a full cycle old back into a fresh pending bill — the lazy
-// equivalent of a monthly billing job, run on read since there's no cron.
+// Regresa cualquier servicio afiliado cuyo último pago (o consulta "al día")
+// tenga más de un ciclo completo de antigüedad a un recibo pendiente nuevo
+// — el equivalente perezoso de un trabajo de facturación mensual, que se
+// ejecuta al leer ya que no hay un cron.
 export async function listBills(userId: string) {
   const bills = await prisma.bill.findMany({ where: { userId }, orderBy: [{ paid: "asc" }, { dueDate: "asc" }] });
   const now = Date.now();
 
   const refreshed = await Promise.all(
     bills.map(async (b) => {
-      if (b.suspended) return b; // paused — stays exactly as-is until resumed
+      if (b.suspended) return b; // pausado — se queda exactamente igual hasta reanudarlo
       if (b.paid && b.paidAt && now - b.paidAt.getTime() >= CYCLE_MS) {
         const { amount, dueInDays } = deriveBillState(b.billerKey, `${b.supplyNumber}:${b.paidAt.getTime()}`);
         return prisma.bill.update({

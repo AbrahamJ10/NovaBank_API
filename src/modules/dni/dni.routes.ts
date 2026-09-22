@@ -4,10 +4,11 @@ import { z } from "zod";
 import { asyncHandler } from "../../lib/asyncHandler";
 import { lookupDni } from "./dni.service";
 
-// This is called from the registration screen before an account (and thus a
-// Bearer token) exists, so it can't require auth — but it proxies a paid,
-// rate-limited third party, so keep this ceiling tight regardless of what
-// the general API limiter allows.
+// Esto se llama desde la pantalla de registro antes de que exista una
+// cuenta (y por lo tanto un Bearer token), así que no puede exigir auth —
+// pero es un proxy hacia un tercero pagado y con límite de solicitudes,
+// así que este techo se mantiene estricto sin importar lo que permita el
+// límite general de la API.
 const dniLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 15,

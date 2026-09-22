@@ -9,9 +9,10 @@ export type DniLookupResult = {
   fullName: string;
 };
 
-// Decolecta's RENIEC-backed lookup (https://decolecta.com). Field names are
-// pinned to what their API actually returns — verified by hand against a
-// live response, not guessed from docs, since third-party API shapes drift.
+// Consulta respaldada por RENIEC a través de Decolecta (https://decolecta.com).
+// Los nombres de los campos están fijados a lo que su API realmente
+// devuelve — verificado a mano contra una respuesta real, no adivinado de
+// la documentación, ya que la forma de las APIs de terceros cambia.
 export async function lookupDni(dni: string): Promise<DniLookupResult> {
   if (!env.DNI_PROVIDER_TOKEN) {
     throw new HttpError(503, "El servicio de verificación de identidad no está configurado");

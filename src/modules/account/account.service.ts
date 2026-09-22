@@ -7,8 +7,9 @@ import { encrypt, decrypt } from "../../lib/crypto";
 import { recordAudit } from "../audit/audit.service";
 import type { RequestMeta } from "../../lib/requestMeta";
 
-// A tiny starter line so a fresh account isn't stuck at zero everywhere —
-// this is an internal-ledger number only, not underwritten credit.
+// Una pequeña línea de crédito inicial para que una cuenta nueva no quede
+// atascada en cero por todos lados — es solo un número del libro contable
+// interno, no crédito real evaluado.
 const STARTER_CREDIT_LINE = 1500;
 
 const MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -23,15 +24,16 @@ function generateAccountNumber() {
   return `191-${randomDigits(4)}-${randomDigits(4)}`;
 }
 
-// Visually shaped like a real CCI (bank-agency-account-check-digit), but
-// not a computable real one — NovaBank isn't a licensed financial entity,
-// so this only ever needs to look right inside its own ledger.
+// Con la forma visual de un CCI real (banco-agencia-cuenta-dígito
+// verificador), pero no uno calculable de verdad — NovaBank no es una
+// entidad financiera con licencia, así que solo necesita verse bien dentro
+// de su propio libro contable.
 function generateCci() {
   return `002-191-${randomDigits(11)}-${randomDigits(2)}`;
 }
 
 function generateCardNumber() {
-  return `4${randomDigits(15)}`; // Visa-shaped: starts with 4, 16 digits
+  return `4${randomDigits(15)}`; // Con forma Visa: empieza con 4, 16 dígitos
 }
 
 function generateCvv() {
@@ -56,10 +58,10 @@ function formatCutDate(cutDay: number): string {
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
-// Called from register() inside a $transaction with the user insert — if
-// this fails, account creation is core to the app working at all, so the
-// whole registration should roll back rather than leave a user with no
-// account.
+// Se llama desde register() dentro de una $transaction junto con la
+// inserción del usuario — si esto falla, la creación de la cuenta es
+// esencial para que la app funcione, así que todo el registro debe
+// revertirse en vez de dejar un usuario sin cuenta.
 export async function createAccountForUser(db: Db, userId: string) {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -107,9 +109,10 @@ export async function getAccountSummary(userId: string) {
   };
 }
 
-// Confirmed with the same email OTP used for profile changes (see
-// profile.service.ts) — the CVV is only ever readable after proving control
-// of the account's verified email, same bar as changing the password.
+// Se confirma con el mismo código OTP por correo que se usa para cambios de
+// perfil (ver profile.service.ts) — el CVV solo se puede leer después de
+// probar control sobre el correo verificado de la cuenta, la misma barrera
+// que cambiar la contraseña.
 export async function revealCvv(userId: string, otpCode: string, meta?: RequestMeta) {
   const [user, account] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId } }),

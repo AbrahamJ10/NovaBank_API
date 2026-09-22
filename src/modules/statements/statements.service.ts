@@ -104,9 +104,9 @@ export async function sendStatement(userId: string, input: SendStatementInput): 
     orderBy: { createdAt: "asc" },
   });
 
-  // Protects the attachment even if the email itself is forwarded/leaked —
-  // the last 4 digits of the DNI are something only the account holder
-  // (and NovaBank) already knows, not sent alongside the PDF.
+  // Protege el adjunto incluso si el correo mismo se reenvía o se filtra —
+  // los últimos 4 dígitos del DNI son algo que solo el titular de la cuenta
+  // (y NovaBank) ya conoce, no se envían junto con el PDF.
   const password = user.dni && user.dni.length >= 4 ? user.dni.slice(-4) : null;
 
   const pdf = await buildStatementPdf({

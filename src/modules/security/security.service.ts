@@ -53,9 +53,10 @@ export async function updateLimits(userId: string, input: UpdateLimitsInput, met
   };
 }
 
-// A stored refresh token's userAgent is whatever the device sent at
-// login/refresh time — shown as-is rather than parsed into a device model,
-// since Expo's fetch userAgent is a generic engine string, not a real UA.
+// El userAgent guardado de un refresh token es lo que el dispositivo haya
+// enviado al momento del login/refresh — se muestra tal cual en vez de
+// interpretarlo como un modelo de dispositivo, ya que el userAgent del
+// fetch de Expo es un string genérico del motor, no un user-agent real.
 function describeDevice(userAgent: string | null): string {
   return userAgent && userAgent.trim().length > 0 ? userAgent : "Dispositivo desconocido";
 }

@@ -1,12 +1,14 @@
 import { Request } from "express";
 import geoip from "geoip-lite";
 
-// Shared by every controller that needs to describe "who/where/what device"
-// made a request — used both for the existing LoginEvent/RefreshToken meta
-// and for the audit trail (see modules/audit). Country/city are best-effort
-// from the request IP (MaxMind-lite offline DB, no external call); this is
-// NOT a precise Peruvian ubigeo (department/province/district), which would
-// require the app to ask for GPS location — not implemented.
+// Compartido por todo controlador que necesite describir "quién/dónde/con
+// qué dispositivo" hizo una solicitud — se usa tanto para el meta existente
+// de LoginEvent/RefreshToken como para el rastro de auditoría (ver
+// modules/audit). country/city son un cálculo aproximado a partir de la IP
+// de la solicitud (base de datos offline tipo MaxMind-lite, sin llamada
+// externa); esto NO es un ubigeo peruano preciso (departamento/provincia/
+// distrito), que requeriría que la app pida la ubicación por GPS — no está
+// implementado.
 export interface RequestMeta {
   ip?: string;
   userAgent?: string;
@@ -19,7 +21,7 @@ export interface RequestMeta {
 
 function normalizeIp(ip?: string): string | undefined {
   if (!ip) return undefined;
-  // IPv4-mapped IPv6 (::ffff:1.2.3.4), common for local/proxied traffic
+  // IPv6 con IPv4 embebida (::ffff:1.2.3.4), común en tráfico local/proxeado
   return ip.startsWith("::ffff:") ? ip.slice(7) : ip;
 }
 

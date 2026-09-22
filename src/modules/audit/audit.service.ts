@@ -13,11 +13,12 @@ export interface RecordAuditInput {
   meta?: RequestMeta;
 }
 
-// Called from inside the service that performs the action (transfers,
-// bill payments, withdrawals, session/login events, profile/security
-// changes, ...) right after it succeeds or fails — never blocks or fails
-// the underlying operation: a broken audit write shouldn't take down a
-// real money-moving request, so errors here are only logged.
+// Se llama desde dentro del servicio que ejecuta la acción (transferencias,
+// pagos de recibo, retiros, eventos de sesión/login, cambios de
+// perfil/seguridad, ...) justo después de que tenga éxito o falle — nunca
+// bloquea ni hace fallar la operación de fondo: una escritura de auditoría
+// rota no debe tumbar una solicitud real de movimiento de dinero, así que
+// los errores aquí solo se registran en el log.
 export async function recordAudit(input: RecordAuditInput): Promise<void> {
   try {
     await prisma.auditLog.create({
@@ -49,12 +50,14 @@ export interface ClientAuditEvent {
   metadata?: Record<string, unknown>;
 }
 
-// Ingests a batch of client-observed events (screen views, button taps) —
-// the only category of audit event the server can't see for itself. Capped
-// at a sane batch size by the route validator; each row still gets the
-// same ip/device/geo context as any server-recorded event. createdAt is
-// always the server's receive time (never trusts a client-supplied
-// timestamp) so the trail can't be backdated by a tampered client.
+// Recibe un lote de eventos observados por el cliente (vistas de pantalla,
+// toques de botón) — la única categoría de evento de auditoría que el
+// servidor no puede ver por sí mismo. El validador de la ruta limita el
+// tamaño del lote a algo razonable; cada fila igual recibe el mismo
+// contexto de ip/dispositivo/geo que cualquier evento registrado por el
+// servidor. createdAt siempre es la hora de recepción del servidor (nunca
+// confía en una marca de tiempo que envíe el cliente) para que el rastro
+// no pueda ser adulterado con fecha falsa por un cliente manipulado.
 export async function recordClientEvents(userId: string, events: ClientAuditEvent[], meta: RequestMeta): Promise<void> {
   if (events.length === 0) return;
 

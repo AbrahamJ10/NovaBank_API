@@ -6,9 +6,10 @@ import { prisma } from "../../lib/prisma";
 import { requestRegisterOtp } from "./otp.service";
 import { compareFaces } from "./face.service";
 
-// Both endpoints run before an account exists, so neither can require auth —
-// but one sends real email and the other calls a metered third-party API,
-// so both get a tight, dedicated ceiling regardless of the general limiter.
+// Los dos endpoints se ejecutan antes de que exista una cuenta, así que
+// ninguno puede exigir auth — pero uno envía un correo real y el otro
+// llama a una API de terceros con medición, así que ambos tienen su propio
+// techo estricto sin importar el límite general.
 const otpRequestLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 5,

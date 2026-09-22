@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { env } from "../config/env";
 
-// Reuse a single PrismaClient instance across hot reloads in dev.
+// Reutiliza una sola instancia de PrismaClient entre recargas en caliente en desarrollo.
 const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 
 export const prisma =

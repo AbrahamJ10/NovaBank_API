@@ -1,12 +1,13 @@
 import { prisma } from "../lib/prisma";
 
-// Token rotation (a new refresh token on every /api/auth/refresh call) and
-// short-lived OTPs both leave behind rows that are permanently useless
-// within minutes — this prunes that accumulation on a schedule (see
-// .github/workflows/cleanup.yml) instead of letting these tables grow
-// forever. Nothing here touches a row that could still be used for
-// anything: revoked/expired tokens can't authenticate, expired OTPs can't
-// be verified, and login events are kept for a real audit-trail window.
+// La rotación de tokens (un refresh token nuevo en cada llamada a
+// /api/auth/refresh) y los OTPs de corta duración dejan atrás filas que
+// quedan permanentemente inútiles en minutos — esto poda esa acumulación
+// con un horario (ver .github/workflows/cleanup.yml) en vez de dejar que
+// estas tablas crezcan para siempre. Nada de esto toca una fila que aún
+// pudiera servir para algo: los tokens revocados/expirados no pueden
+// autenticar, los OTPs expirados no se pueden verificar, y los eventos de
+// login se conservan durante una ventana real de auditoría.
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function main() {

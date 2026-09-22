@@ -6,7 +6,7 @@ import { requestProfileOtpHandler, updateEmailHandler, updatePasswordHandler, up
 
 export const profileRouter = Router();
 
-// Reuses the same tight, email-sending ceiling as password-reset requests.
+// Reutiliza el mismo techo estricto de envío de correos que las solicitudes de restablecer contraseña.
 profileRouter.post("/otp/request", requireAuth, passwordResetLimiter, asyncHandler(requestProfileOtpHandler));
 profileRouter.post("/email", requireAuth, profileLimiter, asyncHandler(updateEmailHandler));
 profileRouter.post("/phone", requireAuth, profileLimiter, asyncHandler(updatePhoneHandler));

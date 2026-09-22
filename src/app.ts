@@ -23,8 +23,9 @@ export function createApp() {
   const app = express();
 
   applySecurityMiddleware(app);
-  // 8mb covers a selfie + DNI photo pair as base64 for face verification;
-  // every route that accepts a body this large is separately rate-limited.
+  // 8mb cubre un par selfie + foto de DNI en base64 para la verificación
+  // facial; toda ruta que acepta un cuerpo así de grande tiene su propio
+  // límite de solicitudes aparte.
   app.use(express.json({ limit: "8mb" }));
   app.use(generalLimiter);
 

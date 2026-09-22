@@ -6,6 +6,6 @@ import { executeTransferHandler, requestTransferOtpHandler } from "./transfers.c
 
 export const transfersRouter = Router();
 
-// Reuses the same tight, email-sending ceiling as password-reset requests.
+// Reutiliza el mismo techo estricto de envío de correos que las solicitudes de restablecer contraseña.
 transfersRouter.post("/otp/request", requireAuth, passwordResetLimiter, asyncHandler(requestTransferOtpHandler));
 transfersRouter.post("/", requireAuth, transferLimiter, asyncHandler(executeTransferHandler));

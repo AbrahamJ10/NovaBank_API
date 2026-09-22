@@ -7,7 +7,7 @@ import { env } from "../config/env";
 
 export function applySecurityMiddleware(app: Express): void {
   app.disable("x-powered-by");
-  app.set("trust proxy", 1); // Render sits behind a proxy; needed for correct req.ip
+  app.set("trust proxy", 1); // Render está detrás de un proxy; se necesita para que req.ip sea correcto
 
   app.use(helmet());
   app.use(compression());

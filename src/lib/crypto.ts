@@ -1,10 +1,12 @@
 import crypto from "crypto";
 import { env } from "../config/env";
 
-// At-rest encryption for sensitive fields (Account.cardNumber/cardCvv) — the
-// DB itself is a shared Neon instance with no separate at-rest encryption
-// guarantee, so this protects a raw DB dump from exposing real-looking card
-// data. AES-256-GCM: random 12-byte IV per value, auth tag prevents tamper.
+// Cifrado en reposo para campos sensibles (Account.cardNumber/cardCvv) — la
+// base de datos en sí es una instancia compartida de Neon sin garantía
+// aparte de cifrado en reposo, así que esto protege que un volcado crudo de
+// la base de datos exponga datos de tarjeta que parezcan reales.
+// AES-256-GCM: IV aleatorio de 12 bytes por valor, el auth tag evita
+// manipulación.
 const ALGORITHM = "aes-256-gcm";
 const key = Buffer.from(env.ENCRYPTION_KEY, "hex");
 

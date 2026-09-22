@@ -59,9 +59,10 @@ export async function register(input: RegisterInput, meta: RequestMeta) {
 
   const passwordHash = await bcrypt.hash(input.password, PASSWORD_SALT_ROUNDS);
 
-  // The account (balance/card/transactions ledger) is core to the app
-  // working at all, so it's created atomically with the user — if either
-  // fails, both roll back rather than leaving an account-less user behind.
+  // La cuenta (saldo/tarjeta/historial de transacciones) es esencial para
+  // que la app funcione, así que se crea de forma atómica junto con el
+  // usuario — si cualquiera de las dos falla, ambas se revierten en vez de
+  // dejar un usuario sin cuenta.
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: {
@@ -78,8 +79,9 @@ export async function register(input: RegisterInput, meta: RequestMeta) {
     return created;
   });
 
-  // Best-effort: a face reference isn't required to have an account, only
-  // to use Face ID login later. Don't fail registration over it.
+  // Mejor esfuerzo: no se necesita una referencia facial para tener una
+  // cuenta, solo para usar el login con Face ID después. No se debe fallar
+  // el registro por esto.
   if (input.dniPhoto && input.selfie) {
     try {
       const [dniPhotoUrl, selfiePhotoUrl] = await Promise.all([
@@ -99,9 +101,10 @@ export async function register(input: RegisterInput, meta: RequestMeta) {
 
 type UserRecord = Awaited<ReturnType<typeof prisma.user.findUnique>>;
 
-// Shared between password login and Face ID login — the lockout must apply
-// regardless of which factor an attacker is trying, or Face ID becomes a
-// side door around the password brute-force protection.
+// Compartido entre el login con contraseña y el login con Face ID — el
+// bloqueo debe aplicarse sin importar qué factor esté intentando un
+// atacante, o Face ID se vuelve una puerta trasera alrededor de la
+// protección contra fuerza bruta.
 async function assertLoginAllowed(user: NonNullable<UserRecord>, meta: RequestMeta) {
   if (user.lockedUntil && user.lockedUntil > new Date()) {
     await prisma.loginEvent.create({
@@ -180,8 +183,9 @@ async function registerSuccess(user: NonNullable<UserRecord>, meta: RequestMeta,
 export async function login(input: LoginInput, meta: RequestMeta) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 
-  // Same generic error whether the email doesn't exist or the password is
-  // wrong — avoids leaking which emails are registered (user enumeration).
+  // El mismo error genérico ya sea que el correo no exista o la contraseña
+  // esté mal — evita revelar qué correos están registrados (enumeración de
+  // usuarios).
   const invalidCredentialsError = () => new HttpError(401, "Correo o contraseña incorrectos");
 
   if (!user) {
@@ -237,12 +241,13 @@ export async function faceLogin(input: FaceLoginInput, meta: RequestMeta) {
     throw new HttpError(400, "Face ID no está configurado para esta cuenta, usa tu contraseña");
   }
 
-  // Compare against both reference photos (DNI photo + verification selfie)
-  // and go with whichever gives the strongest signal — different reference
-  // shots have different lighting/angle, so this is more forgiving than
-  // requiring a match against one specific photo. Run sequentially: Face++'s
-  // free tier rejects concurrent requests from the same API key
-  // (CONCURRENCY_LIMIT_EXCEEDED) when both calls fire in parallel.
+  // Se compara contra las dos fotos de referencia (foto del DNI + selfie de
+  // verificación) y se usa la que dé la señal más fuerte — cada foto de
+  // referencia tiene iluminación/ángulo distintos, así que esto es más
+  // tolerante que exigir coincidencia contra una sola foto específica. Se
+  // ejecutan en secuencia: el plan gratuito de Face++ rechaza solicitudes
+  // concurrentes de la misma clave de API (CONCURRENCY_LIMIT_EXCEEDED)
+  // cuando ambas llamadas se disparan en paralelo.
   const vsDni = await compareFaces({ base64: input.selfie }, { url: user.faceReference.dniPhotoUrl });
   const vsSelfie = await compareFaces({ base64: input.selfie }, { url: user.faceReference.selfiePhotoUrl });
   const best = vsDni.confidence >= vsSelfie.confidence ? vsDni : vsSelfie;
@@ -262,8 +267,9 @@ export async function refresh(refreshToken: string, meta: RequestMeta) {
   const stored = await prisma.refreshToken.findUnique({ where: { tokenHash }, include: { user: true } });
 
   if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-    // If a revoked/expired token is replayed, it may be stolen — revoke every
-    // other active session for this user as a precaution (reuse detection).
+    // Si se reproduce un token revocado/expirado, puede que esté robado —
+    // por precaución se revocan todas las demás sesiones activas de este
+    // usuario (detección de reutilización).
     if (stored?.userId) {
       await prisma.refreshToken.updateMany({
         where: { userId: stored.userId, revokedAt: null },
@@ -299,12 +305,13 @@ export async function refresh(refreshToken: string, meta: RequestMeta) {
 export async function requestPasswordReset(input: PasswordResetRequestInput) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 
-  // Deliberately reveals that *something* is wrong with this email (without
-  // saying whether it's unregistered, inactive, or something else) so the
-  // app can stop the flow here instead of pretending a code was sent. This
-  // is a product choice traded against textbook user-enumeration hardening
-  // (a generic always-204 response) — the message is intentionally vague so
-  // it doesn't confirm which specific case applies.
+  // A propósito revela que *algo* está mal con este correo (sin decir si no
+  // está registrado, está inactivo, u otra razón) para que la app pueda
+  // detener el flujo aquí en vez de fingir que se envió un código. Es una
+  // decisión de producto que se sacrifica frente al endurecimiento
+  // tradicional contra enumeración de usuarios (una respuesta 204 genérica
+  // siempre) — el mensaje es intencionalmente vago para no confirmar cuál
+  // caso específico aplica.
   if (!user || !user.isActive) {
     throw new HttpError(404, "Esta cuenta no está disponible en este momento.");
   }
@@ -327,9 +334,10 @@ export async function confirmPasswordReset(input: PasswordResetConfirmInput) {
       where: { id: user.id },
       data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null },
     }),
-    // A password reset is a strong signal any existing session may not be
-    // the account holder anymore — sign out every device, same as a stolen
-    // refresh token triggers in refresh() above.
+    // Restablecer la contraseña es una señal fuerte de que cualquier sesión
+    // existente puede que ya no sea del titular de la cuenta — se cierra la
+    // sesión en todos los dispositivos, igual que un refresh token robado
+    // lo dispara en refresh() arriba.
     prisma.refreshToken.updateMany({
       where: { userId: user.id, revokedAt: null },
       data: { revokedAt: new Date() },

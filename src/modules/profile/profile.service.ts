@@ -12,10 +12,10 @@ function toPublicUser(user: { id: string; email: string; fullName: string; phone
   return { id: user.id, email: user.email, fullName: user.fullName, phone: user.phone, dni: user.dni };
 }
 
-// Every profile change (email/phone/password) is confirmed with a code sent
-// to the account's CURRENT verified email — proves whoever is making the
-// change controls the account already on file, regardless of which field
-// they're changing.
+// Todo cambio de perfil (correo/teléfono/contraseña) se confirma con un
+// código enviado al correo ACTUAL verificado de la cuenta — prueba que
+// quien hace el cambio controla la cuenta ya registrada, sin importar cuál
+// campo esté cambiando.
 export async function requestProfileOtp(userId: string): Promise<void> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   await sendProfileOtp(user.email);

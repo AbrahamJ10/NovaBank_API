@@ -14,10 +14,11 @@ function initialsOf(name: string) {
   );
 }
 
-// A brand-new account has no real transfer history to suggest beneficiaries
-// from, so it starts with a few illustrative ones — including one marked
-// inactive, so the "destination account rejected" path stays reachable and
-// testable without needing to fabricate that state by hand.
+// Una cuenta recién creada no tiene historial real de transferencias del
+// cual sugerir beneficiarios, así que empieza con algunos a modo de
+// ejemplo — incluyendo uno marcado como inactivo, para que el camino de
+// "cuenta destino rechazada" siga siendo alcanzable y probable sin tener
+// que fabricar ese estado a mano.
 export async function seedDefaultPayees(db: Db, userId: string) {
   await db.payee.createMany({
     data: [

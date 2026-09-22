@@ -22,8 +22,8 @@ export async function requestTransfer(email: string) {
 }
 
 export async function executeTransfer(userId: string, email: string, input: ExecuteTransferInput, meta?: RequestMeta) {
-  // Verifying the code first means a wrong/expired code never even reveals
-  // whether the destination account exists or has enough balance behind it.
+  // Verificar el código primero significa que uno incorrecto/expirado nunca
+  // llega a revelar si la cuenta destino existe o tiene saldo suficiente.
   await verifyTransferOtp(email, input.otpCode);
 
   const [payee, account] = await Promise.all([
@@ -34,8 +34,9 @@ export async function executeTransfer(userId: string, email: string, input: Exec
   if (!payee) throw new HttpError(404, "Beneficiario no encontrado");
   if (!account) throw new HttpError(404, "Cuenta no encontrada");
 
-  // Mirrors a real bank's own rejection reasons (closed/frozen destination)
-  // instead of silently succeeding — the sender's balance stays untouched.
+  // Refleja las razones de rechazo reales de un banco (destino
+  // cerrado/congelado) en vez de tener éxito en silencio — el saldo del
+  // remitente queda intacto.
   if (payee.inactive) {
     await recordAudit({
       userId,
@@ -66,8 +67,9 @@ export async function executeTransfer(userId: string, email: string, input: Exec
     throw new HttpError(400, "Saldo insuficiente");
   }
 
-  // Rolling 24h window rather than a calendar day — avoids timezone edge
-  // cases around midnight while still meaning "daily limit" in practice.
+  // Ventana móvil de 24h en vez de un día calendario — evita los casos
+  // límite de zona horaria alrededor de la medianoche, manteniendo en la
+  // práctica el sentido de "límite diario".
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const sentRecently = await prisma.transaction.aggregate({
     where: { accountId: account.id, category: "TRANSFERENCIAS", kind: "DEBIT", createdAt: { gte: since } },

@@ -12,8 +12,9 @@ export function notFoundHandler(_req: Request, res: Response): void {
   res.status(404).json({ error: "Recurso no encontrado" });
 }
 
-// Centralized error handler — keeps stack traces and internal details out of
-// responses in production so we don't leak implementation details to callers.
+// Manejador de errores centralizado — mantiene los stack traces y detalles
+// internos fuera de las respuestas en producción para no filtrar detalles
+// de implementación a quien llame.
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof ZodError) {
     res.status(400).json({ error: "Datos inválidos", details: err.flatten() });
@@ -25,10 +26,10 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
-  // express.json() throws a SyntaxError (body-parser sets status 400 on it)
-  // when the request body isn't valid JSON — a malformed client request,
-  // not a server failure, so this must not fall through to the generic 500
-  // below.
+  // express.json() lanza un SyntaxError (body-parser le pone status 400)
+  // cuando el cuerpo de la solicitud no es JSON válido — es una solicitud
+  // del cliente mal formada, no una falla del servidor, así que esto no
+  // debe caer en el 500 genérico de abajo.
   if (err instanceof SyntaxError && (err as SyntaxError & { status?: number }).status === 400) {
     res.status(400).json({ error: "El cuerpo de la solicitud no es JSON válido" });
     return;

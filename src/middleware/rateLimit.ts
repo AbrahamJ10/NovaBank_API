@@ -1,8 +1,8 @@
 import rateLimit from "express-rate-limit";
 
-// General ceiling for all API traffic — blunts scripted abuse/DoS at the
-// application layer (volumetric DDoS still needs to be stopped upstream, e.g.
-// Render/Cloudflare, this cannot do that on its own).
+// Techo general para todo el tráfico de la API — amortigua abuso/DoS por
+// script en la capa de aplicación (un DDoS volumétrico igual necesita
+// detenerse más arriba, ej. Render/Cloudflare, esto no puede hacerlo solo).
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
@@ -10,8 +10,9 @@ export const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Tighter limit specifically for auth endpoints to slow down credential
-// stuffing / brute force even before the per-account lockout kicks in.
+// Límite más estricto específicamente para los endpoints de auth, para
+// frenar el relleno de credenciales / fuerza bruta incluso antes de que
+// entre en acción el bloqueo por cuenta.
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
@@ -20,8 +21,9 @@ export const authLimiter = rateLimit({
   message: { error: "Demasiados intentos. Intenta de nuevo en unos minutos." },
 });
 
-// Sends a real email, so this stays tight regardless of what authLimiter
-// allows — mirrors the registration OTP request limiter.
+// Envía un correo real, así que este se mantiene estricto sin importar lo
+// que permita authLimiter — refleja el límite de solicitudes de OTP del
+// registro.
 export const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 5,
@@ -30,9 +32,9 @@ export const passwordResetLimiter = rateLimit({
   message: { error: "Demasiadas solicitudes, intenta de nuevo más tarde." },
 });
 
-// Same shape as passwordResetLimiter — a separate export just so a burst
-// of password-reset attempts can't also eat into someone's transfer
-// attempts for the hour (and vice versa).
+// Misma forma que passwordResetLimiter — un export aparte solo para que una
+// ráfaga de intentos de restablecer contraseña no consuma también los
+// intentos de transferencia de alguien durante la hora (y viceversa).
 export const transferLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 20,
@@ -41,9 +43,9 @@ export const transferLimiter = rateLimit({
   message: { error: "Demasiadas solicitudes de transferencia, intenta de nuevo más tarde." },
 });
 
-// Guards the profile email/phone/password-change endpoints — tighter than
-// transferLimiter since these are sensitive account-takeover-adjacent
-// operations, not routine daily traffic.
+// Protege los endpoints de cambio de correo/teléfono/contraseña del perfil
+// — más estricto que transferLimiter ya que son operaciones sensibles,
+// cercanas a un robo de cuenta, no tráfico rutinario del día a día.
 export const profileLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 10,
@@ -52,9 +54,10 @@ export const profileLimiter = rateLimit({
   message: { error: "Demasiadas solicitudes, intenta de nuevo más tarde." },
 });
 
-// Client-reported navigation/button-tap telemetry is frequent by nature
-// (batched every few seconds while the app is open) — generous ceiling that
-// only exists to stop a runaway client from flooding the audit table.
+// La telemetría de navegación/toques de botón que reporta el cliente es
+// frecuente por naturaleza (se envía en lotes cada pocos segundos mientras
+// la app está abierta) — un techo generoso que solo existe para detener a
+// un cliente descontrolado que inunde la tabla de auditoría.
 export const auditLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   limit: 120,
@@ -63,9 +66,10 @@ export const auditLimiter = rateLimit({
   message: { error: "Demasiados eventos, intenta de nuevo más tarde." },
 });
 
-// Generating a statement PDF is heavier than a typical request — kept
-// separate so a burst of statement requests can't also eat into someone's
-// password-reset attempts for the hour.
+// Generar un PDF de estado de cuenta es más pesado que una solicitud
+// típica — se mantiene aparte para que una ráfaga de solicitudes de estado
+// de cuenta no consuma también los intentos de restablecer contraseña de
+// alguien durante la hora.
 export const statementLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 10,

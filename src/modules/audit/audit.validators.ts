@@ -7,8 +7,8 @@ const eventSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-// Capped batch size — the app flushes its local queue every few seconds, so
-// a single request should never need more than this many events.
+// Tamaño de lote limitado — la app vacía su cola local cada pocos segundos,
+// así que una sola solicitud nunca debería necesitar más eventos que este.
 export const recordEventsSchema = z.object({
   events: z.array(eventSchema).min(1).max(50),
 });

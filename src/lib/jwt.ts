@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { env } from "../config/env";
 
 export interface AccessTokenPayload {
-  sub: string; // user id
+  sub: string; // id del usuario
   email: string;
 }
 
@@ -15,8 +15,9 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
   return jwt.verify(token, env.JWT_ACCESS_SECRET) as AccessTokenPayload;
 }
 
-// Refresh tokens are opaque random strings, not JWTs: we store only a hash of
-// them server-side so a stolen DB dump can't be replayed as a valid session.
+// Los refresh tokens son strings aleatorios opacos, no JWTs: solo se guarda
+// un hash de ellos del lado del servidor para que un volcado robado de la
+// base de datos no pueda reproducirse como una sesión válida.
 export function generateRefreshToken(): string {
   return crypto.randomBytes(64).toString("hex");
 }
