@@ -9,7 +9,7 @@ import geoip from "geoip-lite";
 // externa); esto NO es un ubigeo peruano preciso (departamento/provincia/
 // distrito), que requeriría que la app pida la ubicación por GPS — no está
 // implementado.
-export interface RequestMeta {
+export interface MetaSolicitud {
   ip?: string;
   userAgent?: string;
   device?: string;
@@ -25,7 +25,7 @@ function normalizarIp(ip?: string): string | undefined {
   return ip.startsWith("::ffff:") ? ip.slice(7) : ip;
 }
 
-export function getRequestMeta(peticion: Request): RequestMeta {
+export function obtenerMetaSolicitud(peticion: Request): MetaSolicitud {
   const ip = normalizarIp(peticion.ip);
   const consulta = ip ? geoip.lookup(ip) : null;
 

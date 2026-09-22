@@ -1,11 +1,11 @@
 import { NextFunction, Request, Response } from "express";
 import { verifyAccessToken } from "../libreria/jwt";
 
-export interface AuthenticatedRequest extends Request {
+export interface SolicitudAutenticada extends Request {
   user?: { id: string; email: string };
 }
 
-export function requireAuth(peticion: AuthenticatedRequest, respuesta: Response, siguiente: NextFunction): void {
+export function requerirAutenticacion(peticion: SolicitudAutenticada, respuesta: Response, siguiente: NextFunction): void {
   const encabezado = peticion.headers.authorization;
   if (!encabezado?.startsWith("Bearer ")) {
     respuesta.status(401).json({ error: "No autenticado" });

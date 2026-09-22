@@ -1,6 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 import { env } from "../configuracion/entorno";
-import { HttpError } from "../intermediarios/manejadorErrores";
+import { ErrorHttp } from "../intermediarios/manejadorErrores";
 
 if (env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET) {
   cloudinary.config({
@@ -22,7 +22,7 @@ function aDataUri(base64: string) {
 // la imagen directo por URL en vez de volver a subirla.
 export async function subirReferenciaFacial(base64: string, idPublico: string): Promise<string> {
   if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
-    throw new HttpError(503, "El almacenamiento de fotos no está configurado");
+    throw new ErrorHttp(503, "El almacenamiento de fotos no está configurado");
   }
 
   const resultado = await cloudinary.uploader.upload(aDataUri(base64), {

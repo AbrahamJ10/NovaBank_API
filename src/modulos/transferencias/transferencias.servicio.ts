@@ -1,9 +1,9 @@
 import { prisma } from "../../libreria/prisma";
-import { HttpError } from "../../intermediarios/manejadorErrores";
-import { recordTransaction } from "../transacciones/transacciones.servicio";
-import { requestTransferOtp, verifyTransferOtp } from "../verificacion/otp.servicio";
-import { recordAudit } from "../auditoria/auditoria.servicio";
-import type { RequestMeta } from "../../libreria/metaSolicitud";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
+import { registrarTransaccion } from "../transacciones/transacciones.servicio";
+import { solicitarOtpTransferencia, verificarOtpTransferencia } from "../verificacion/otp.servicio";
+import { registrarAuditoria } from "../auditoria/auditoria.servicio";
+import type { MetaSolicitud } from "../../libreria/metaSolicitud";
 
 export type EntradaEjecutarTransferencia = {
   payeeId: string;
@@ -18,27 +18,27 @@ function generarReferencia() {
 }
 
 export async function solicitarTransferencia(correo: string) {
-  await requestTransferOtp(correo);
+  await solicitarOtpTransferencia(correo);
 }
 
-export async function ejecutarTransferencia(idUsuario: string, correo: string, entrada: EntradaEjecutarTransferencia, metaSolicitud?: RequestMeta) {
+export async function ejecutarTransferencia(idUsuario: string, correo: string, entrada: EntradaEjecutarTransferencia, metaSolicitud?: MetaSolicitud) {
   // Verificar el código primero significa que uno incorrecto/expirado nunca
   // llega a revelar si la cuenta destino existe o tiene saldo suficiente.
-  await verifyTransferOtp(correo, entrada.otpCode);
+  await verificarOtpTransferencia(correo, entrada.otpCode);
 
   const [beneficiario, cuenta] = await Promise.all([
     prisma.payee.findFirst({ where: { id: entrada.payeeId, userId: idUsuario } }),
     prisma.account.findUnique({ where: { userId: idUsuario } }),
   ]);
 
-  if (!beneficiario) throw new HttpError(404, "Beneficiario no encontrado");
-  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (!beneficiario) throw new ErrorHttp(404, "Beneficiario no encontrado");
+  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
 
   // Refleja las razones de rechazo reales de un banco (destino
   // cerrado/congelado) en vez de tener éxito en silencio — el saldo del
   // remitente queda intacto.
   if (beneficiario.inactive) {
-    await recordAudit({
+    await registrarAuditoria({
       userId: idUsuario,
       category: "TRANSFERENCIA",
       action: "transfer_failed_inactive_payee",
@@ -46,17 +46,17 @@ export async function ejecutarTransferencia(idUsuario: string, correo: string, e
       metadata: { payeeId: beneficiario.id, payeeName: beneficiario.name, amount: entrada.amount },
       meta: metaSolicitud,
     });
-    throw new HttpError(422, "La cuenta destino está inactiva", {
+    throw new ErrorHttp(422, "La cuenta destino está inactiva", {
       reasonCode: "R-3204",
       reasonLabel: "Cuenta destino inactiva",
     });
   }
 
   if (entrada.amount <= 0) {
-    throw new HttpError(400, "El monto debe ser mayor a cero");
+    throw new ErrorHttp(400, "El monto debe ser mayor a cero");
   }
   if (Number(cuenta.availableBalance) < entrada.amount) {
-    await recordAudit({
+    await registrarAuditoria({
       userId: idUsuario,
       category: "TRANSFERENCIA",
       action: "transfer_failed_insufficient_balance",
@@ -64,7 +64,7 @@ export async function ejecutarTransferencia(idUsuario: string, correo: string, e
       metadata: { payeeId: beneficiario.id, payeeName: beneficiario.name, amount: entrada.amount },
       meta: metaSolicitud,
     });
-    throw new HttpError(400, "Saldo insuficiente");
+    throw new ErrorHttp(400, "Saldo insuficiente");
   }
 
   // Ventana móvil de 24h en vez de un día calendario — evita los casos
@@ -78,7 +78,7 @@ export async function ejecutarTransferencia(idUsuario: string, correo: string, e
   const yaEnviado = Number(enviadoRecientemente._sum.amount ?? 0);
   const limiteEnLinea = Number(cuenta.limitOnline);
   if (yaEnviado + entrada.amount > limiteEnLinea) {
-    await recordAudit({
+    await registrarAuditoria({
       userId: idUsuario,
       category: "TRANSFERENCIA",
       action: "transfer_failed_limit_exceeded",
@@ -86,7 +86,7 @@ export async function ejecutarTransferencia(idUsuario: string, correo: string, e
       metadata: { payeeId: beneficiario.id, payeeName: beneficiario.name, amount: entrada.amount, limitOnline: limiteEnLinea },
       meta: metaSolicitud,
     });
-    throw new HttpError(422, "Superaste tu límite de transferencias en línea", {
+    throw new ErrorHttp(422, "Superaste tu límite de transferencias en línea", {
       reasonCode: "R-LIMIT",
       reasonLabel: `Límite diario de S/ ${limiteEnLinea.toFixed(2)} superado`,
     });
@@ -98,7 +98,7 @@ export async function ejecutarTransferencia(idUsuario: string, correo: string, e
       data: { availableBalance: { decrement: entrada.amount } },
     });
 
-    return recordTransaction(
+    return registrarTransaccion(
       tx,
       idUsuario,
       cuenta.id,
@@ -122,7 +122,7 @@ export async function ejecutarTransferencia(idUsuario: string, correo: string, e
     );
   });
 
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "TRANSFERENCIA",
     action: "transfer_completed",

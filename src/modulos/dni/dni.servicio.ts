@@ -1,5 +1,5 @@
 import { env } from "../../configuracion/entorno";
-import { HttpError } from "../../intermediarios/manejadorErrores";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
 
 export type DniLookupResult = {
   dni: string;
@@ -15,7 +15,7 @@ export type DniLookupResult = {
 // la documentación, ya que la forma de las APIs de terceros cambia.
 export async function consultarDni(dni: string): Promise<DniLookupResult> {
   if (!env.DNI_PROVIDER_TOKEN) {
-    throw new HttpError(503, "El servicio de verificación de identidad no está configurado");
+    throw new ErrorHttp(503, "El servicio de verificación de identidad no está configurado");
   }
 
   const respuesta = await fetch(`https://api.decolecta.com/v1/reniec/dni?numero=${dni}`, {
@@ -23,13 +23,13 @@ export async function consultarDni(dni: string): Promise<DniLookupResult> {
   });
 
   if (respuesta.status === 404) {
-    throw new HttpError(404, "No se encontró información para ese DNI");
+    throw new ErrorHttp(404, "No se encontró información para ese DNI");
   }
   if (respuesta.status === 429) {
-    throw new HttpError(429, "Se alcanzó el límite de consultas del proveedor, intenta más tarde");
+    throw new ErrorHttp(429, "Se alcanzó el límite de consultas del proveedor, intenta más tarde");
   }
   if (!respuesta.ok) {
-    throw new HttpError(502, "El servicio de verificación de identidad no está disponible");
+    throw new ErrorHttp(502, "El servicio de verificación de identidad no está disponible");
   }
 
   const datos = (await respuesta.json()) as Record<string, unknown>;
@@ -40,7 +40,7 @@ export async function consultarDni(dni: string): Promise<DniLookupResult> {
   const nombreCompleto = String(datos.full_name ?? [nombres, apellidoPaterno, apellidoMaterno].filter(Boolean).join(" "));
 
   if (!nombres && !nombreCompleto) {
-    throw new HttpError(502, "Respuesta inesperada del servicio de verificación de identidad");
+    throw new ErrorHttp(502, "Respuesta inesperada del servicio de verificación de identidad");
   }
 
   return { dni, nombres, apellidoPaterno, apellidoMaterno, fullName: nombreCompleto };

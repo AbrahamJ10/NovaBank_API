@@ -1,11 +1,11 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../../libreria/prisma";
-import { HttpError } from "../../intermediarios/manejadorErrores";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
 import {
-  generateRefreshToken,
-  hashToken,
-  refreshTtlToDate,
-  signAccessToken,
+  generarTokenRefresco,
+  hashearToken,
+  ttlRefrescoAFecha,
+  firmarTokenAcceso,
 } from "../../libreria/jwt";
 import type {
   EntradaLoginFacial,
@@ -14,15 +14,15 @@ import type {
   EntradaSolicitarRestablecerContrasena,
   EntradaRegistro,
 } from "./autenticacion.validadores";
-import { requestPasswordResetOtp, verifyPasswordResetOtp, verifyRegisterOtp } from "../verificacion/otp.servicio";
+import { solicitarOtpRestablecerContrasena, verificarOtpRestablecerContrasena, verificarOtpRegistro } from "../verificacion/otp.servicio";
 import { crearCuentaParaUsuario } from "../cuenta/cuenta.servicio";
 import { sembrarBeneficiariosPorDefecto } from "../destinatarios/destinatarios.servicio";
 import { sembrarRecibosPorDefecto } from "../recibos/recibos.servicio";
 import { compareFaces } from "../verificacion/rostro.servicio";
 import { subirReferenciaFacial } from "../../libreria/cloudinary";
-import { createNotification } from "../notificaciones/notificaciones.servicio";
-import { recordAudit } from "../auditoria/auditoria.servicio";
-import type { RequestMeta } from "../../libreria/metaSolicitud";
+import { crearNotificacion } from "../notificaciones/notificaciones.servicio";
+import { registrarAuditoria } from "../auditoria/auditoria.servicio";
+import type { MetaSolicitud } from "../../libreria/metaSolicitud";
 
 const MAX_INTENTOS_FALLIDOS = 5;
 const DURACION_BLOQUEO_MS = 15 * 60 * 1000;
@@ -32,15 +32,15 @@ function aUsuarioPublico(usuario: { id: string; email: string; fullName: string;
   return { id: usuario.id, email: usuario.email, fullName: usuario.fullName, phone: usuario.phone, dni: usuario.dni };
 }
 
-async function emitirParDeTokens(idUsuario: string, correo: string, metaSolicitud: RequestMeta) {
-  const accessToken = signAccessToken({ sub: idUsuario, email: correo });
-  const refreshToken = generateRefreshToken();
+async function emitirParDeTokens(idUsuario: string, correo: string, metaSolicitud: MetaSolicitud) {
+  const accessToken = firmarTokenAcceso({ sub: idUsuario, email: correo });
+  const refreshToken = generarTokenRefresco();
 
   await prisma.refreshToken.create({
     data: {
       userId: idUsuario,
-      tokenHash: hashToken(refreshToken),
-      expiresAt: refreshTtlToDate(),
+      tokenHash: hashearToken(refreshToken),
+      expiresAt: ttlRefrescoAFecha(),
       ip: metaSolicitud.ip,
       userAgent: metaSolicitud.userAgent,
     },
@@ -49,13 +49,13 @@ async function emitirParDeTokens(idUsuario: string, correo: string, metaSolicitu
   return { accessToken, refreshToken };
 }
 
-export async function registrar(entrada: EntradaRegistro, metaSolicitud: RequestMeta) {
+export async function registrar(entrada: EntradaRegistro, metaSolicitud: MetaSolicitud) {
   const existente = await prisma.user.findUnique({ where: { email: entrada.email } });
   if (existente) {
-    throw new HttpError(409, "Ya existe una cuenta con ese correo");
+    throw new ErrorHttp(409, "Ya existe una cuenta con ese correo");
   }
 
-  await verifyRegisterOtp(entrada.email, entrada.otpCode);
+  await verificarOtpRegistro(entrada.email, entrada.otpCode);
 
   const hashContrasena = await bcrypt.hash(entrada.password, RONDAS_SAL_CONTRASENA);
 
@@ -95,7 +95,7 @@ export async function registrar(entrada: EntradaRegistro, metaSolicitud: Request
   }
 
   const tokens = await emitirParDeTokens(usuario.id, usuario.email, metaSolicitud);
-  await recordAudit({ userId: usuario.id, category: "SESION", action: "register", meta: metaSolicitud });
+  await registrarAuditoria({ userId: usuario.id, category: "SESION", action: "register", meta: metaSolicitud });
   return { user: aUsuarioPublico(usuario), ...tokens };
 }
 
@@ -105,13 +105,13 @@ type RegistroUsuario = Awaited<ReturnType<typeof prisma.user.findUnique>>;
 // bloqueo debe aplicarse sin importar qué factor esté intentando un
 // atacante, o Face ID se vuelve una puerta trasera alrededor de la
 // protección contra fuerza bruta.
-async function verificarLoginPermitido(usuario: NonNullable<RegistroUsuario>, metaSolicitud: RequestMeta) {
+async function verificarLoginPermitido(usuario: NonNullable<RegistroUsuario>, metaSolicitud: MetaSolicitud) {
   if (usuario.lockedUntil && usuario.lockedUntil > new Date()) {
     await prisma.loginEvent.create({
       data: { userId: usuario.id, email: usuario.email, result: "ACCOUNT_LOCKED", ip: metaSolicitud.ip, userAgent: metaSolicitud.userAgent },
     });
-    await recordAudit({ userId: usuario.id, category: "SESION", action: "login_blocked_locked", success: false, meta: metaSolicitud });
-    throw new HttpError(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos", {
+    await registrarAuditoria({ userId: usuario.id, category: "SESION", action: "login_blocked_locked", success: false, meta: metaSolicitud });
+    throw new ErrorHttp(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos", {
       lockedUntil: usuario.lockedUntil.toISOString(),
     });
   }
@@ -120,12 +120,12 @@ async function verificarLoginPermitido(usuario: NonNullable<RegistroUsuario>, me
     await prisma.loginEvent.create({
       data: { userId: usuario.id, email: usuario.email, result: "ACCOUNT_INACTIVE", ip: metaSolicitud.ip, userAgent: metaSolicitud.userAgent },
     });
-    await recordAudit({ userId: usuario.id, category: "SESION", action: "login_blocked_inactive", success: false, meta: metaSolicitud });
-    throw new HttpError(403, "Cuenta inactiva");
+    await registrarAuditoria({ userId: usuario.id, category: "SESION", action: "login_blocked_inactive", success: false, meta: metaSolicitud });
+    throw new ErrorHttp(403, "Cuenta inactiva");
   }
 }
 
-async function registrarIntentoFallido(usuario: NonNullable<RegistroUsuario>, metaSolicitud: RequestMeta, errorInvalido: () => HttpError) {
+async function registrarIntentoFallido(usuario: NonNullable<RegistroUsuario>, metaSolicitud: MetaSolicitud, errorInvalido: () => ErrorHttp) {
   const intentosFallidos = usuario.failedLoginAttempts + 1;
   const debeBloquear = intentosFallidos >= MAX_INTENTOS_FALLIDOS;
   const bloqueadoHasta = debeBloquear ? new Date(Date.now() + DURACION_BLOQUEO_MS) : null;
@@ -143,7 +143,7 @@ async function registrarIntentoFallido(usuario: NonNullable<RegistroUsuario>, me
       userAgent: metaSolicitud.userAgent,
     },
   });
-  await recordAudit({
+  await registrarAuditoria({
     userId: usuario.id,
     category: "SESION",
     action: debeBloquear ? "login_failed_now_locked" : "login_failed",
@@ -153,14 +153,14 @@ async function registrarIntentoFallido(usuario: NonNullable<RegistroUsuario>, me
   });
 
   if (debeBloquear) {
-    throw new HttpError(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos", {
+    throw new ErrorHttp(423, "Cuenta bloqueada temporalmente por demasiados intentos fallidos", {
       lockedUntil: bloqueadoHasta!.toISOString(),
     });
   }
   throw errorInvalido();
 }
 
-async function registrarLoginExitoso(usuario: NonNullable<RegistroUsuario>, metaSolicitud: RequestMeta, metodo: "password" | "face_id") {
+async function registrarLoginExitoso(usuario: NonNullable<RegistroUsuario>, metaSolicitud: MetaSolicitud, metodo: "password" | "face_id") {
   await prisma.user.update({
     where: { id: usuario.id },
     data: { failedLoginAttempts: 0, lockedUntil: null },
@@ -168,9 +168,9 @@ async function registrarLoginExitoso(usuario: NonNullable<RegistroUsuario>, meta
   await prisma.loginEvent.create({
     data: { userId: usuario.id, email: usuario.email, result: "SUCCESS", ip: metaSolicitud.ip, userAgent: metaSolicitud.userAgent },
   });
-  await recordAudit({ userId: usuario.id, category: "SESION", action: "login_success", metadata: { method: metodo }, meta: metaSolicitud });
+  await registrarAuditoria({ userId: usuario.id, category: "SESION", action: "login_success", metadata: { method: metodo }, meta: metaSolicitud });
   if (usuario.alertLogin) {
-    await createNotification(prisma, usuario.id, {
+    await crearNotificacion(prisma, usuario.id, {
       title: "Nuevo inicio de sesión",
       body: metaSolicitud.ip ? `Iniciaste sesión desde ${metaSolicitud.ip}.` : "Iniciaste sesión con tu contraseña.",
       icon: "login",
@@ -180,19 +180,19 @@ async function registrarLoginExitoso(usuario: NonNullable<RegistroUsuario>, meta
   }
 }
 
-export async function iniciarSesion(entrada: EntradaLogin, metaSolicitud: RequestMeta) {
+export async function iniciarSesion(entrada: EntradaLogin, metaSolicitud: MetaSolicitud) {
   const usuario = await prisma.user.findUnique({ where: { email: entrada.email } });
 
   // El mismo error genérico ya sea que el correo no exista o la contraseña
   // esté mal — evita revelar qué correos están registrados (enumeración de
   // usuarios).
-  const errorCredencialesInvalidas = () => new HttpError(401, "Correo o contraseña incorrectos");
+  const errorCredencialesInvalidas = () => new ErrorHttp(401, "Correo o contraseña incorrectos");
 
   if (!usuario) {
     await prisma.loginEvent.create({
       data: { email: entrada.email, result: "INVALID_CREDENTIALS", ip: metaSolicitud.ip, userAgent: metaSolicitud.userAgent },
     });
-    await recordAudit({
+    await registrarAuditoria({
       category: "SESION",
       action: "login_failed_unknown_email",
       success: false,
@@ -215,16 +215,16 @@ export async function iniciarSesion(entrada: EntradaLogin, metaSolicitud: Reques
   return { user: aUsuarioPublico(usuario), ...tokens };
 }
 
-export async function iniciarSesionConRostro(entrada: EntradaLoginFacial, metaSolicitud: RequestMeta) {
+export async function iniciarSesionConRostro(entrada: EntradaLoginFacial, metaSolicitud: MetaSolicitud) {
   const usuario = await prisma.user.findUnique({ where: { email: entrada.email }, include: { faceReference: true } });
 
-  const errorInvalido = () => new HttpError(401, "No pudimos verificar tu identidad");
+  const errorInvalido = () => new ErrorHttp(401, "No pudimos verificar tu identidad");
 
   if (!usuario) {
     await prisma.loginEvent.create({
       data: { email: entrada.email, result: "INVALID_CREDENTIALS", ip: metaSolicitud.ip, userAgent: metaSolicitud.userAgent },
     });
-    await recordAudit({
+    await registrarAuditoria({
       category: "SESION",
       action: "login_failed_unknown_email",
       success: false,
@@ -238,7 +238,7 @@ export async function iniciarSesionConRostro(entrada: EntradaLoginFacial, metaSo
   await verificarLoginPermitido(usuario, metaSolicitud);
 
   if (!usuario.faceReference) {
-    throw new HttpError(400, "Face ID no está configurado para esta cuenta, usa tu contraseña");
+    throw new ErrorHttp(400, "Face ID no está configurado para esta cuenta, usa tu contraseña");
   }
 
   // Se compara contra las dos fotos de referencia (foto del DNI + selfie de
@@ -262,8 +262,8 @@ export async function iniciarSesionConRostro(entrada: EntradaLoginFacial, metaSo
   return { user: aUsuarioPublico(usuario), ...tokens };
 }
 
-export async function refrescarSesion(refreshToken: string, metaSolicitud: RequestMeta) {
-  const hashDelToken = hashToken(refreshToken);
+export async function refrescarSesion(refreshToken: string, metaSolicitud: MetaSolicitud) {
+  const hashDelToken = hashearToken(refreshToken);
   const guardado = await prisma.refreshToken.findUnique({ where: { tokenHash: hashDelToken }, include: { user: true } });
 
   if (!guardado || guardado.revokedAt || guardado.expiresAt < new Date()) {
@@ -276,11 +276,11 @@ export async function refrescarSesion(refreshToken: string, metaSolicitud: Reque
         data: { revokedAt: new Date() },
       });
     }
-    throw new HttpError(401, "Sesión inválida, inicia sesión nuevamente");
+    throw new ErrorHttp(401, "Sesión inválida, inicia sesión nuevamente");
   }
 
-  const nuevoRefreshToken = generateRefreshToken();
-  const nuevoHashToken = hashToken(nuevoRefreshToken);
+  const nuevoRefreshToken = generarTokenRefresco();
+  const nuevoHashToken = hashearToken(nuevoRefreshToken);
 
   await prisma.$transaction([
     prisma.refreshToken.update({
@@ -291,14 +291,14 @@ export async function refrescarSesion(refreshToken: string, metaSolicitud: Reque
       data: {
         userId: guardado.userId,
         tokenHash: nuevoHashToken,
-        expiresAt: refreshTtlToDate(),
+        expiresAt: ttlRefrescoAFecha(),
         ip: metaSolicitud.ip,
         userAgent: metaSolicitud.userAgent,
       },
     }),
   ]);
 
-  const accessToken = signAccessToken({ sub: guardado.user.id, email: guardado.user.email });
+  const accessToken = firmarTokenAcceso({ sub: guardado.user.id, email: guardado.user.email });
   return { accessToken, refreshToken: nuevoRefreshToken, user: aUsuarioPublico(guardado.user) };
 }
 
@@ -313,18 +313,18 @@ export async function solicitarRestablecerContrasena(entrada: EntradaSolicitarRe
   // siempre) — el mensaje es intencionalmente vago para no confirmar cuál
   // caso específico aplica.
   if (!usuario || !usuario.isActive) {
-    throw new HttpError(404, "Esta cuenta no está disponible en este momento.");
+    throw new ErrorHttp(404, "Esta cuenta no está disponible en este momento.");
   }
 
-  await requestPasswordResetOtp(entrada.email);
+  await solicitarOtpRestablecerContrasena(entrada.email);
 }
 
 export async function confirmarRestablecerContrasena(entrada: EntradaConfirmarRestablecerContrasena) {
-  await verifyPasswordResetOtp(entrada.email, entrada.code);
+  await verificarOtpRestablecerContrasena(entrada.email, entrada.code);
 
   const usuario = await prisma.user.findUnique({ where: { email: entrada.email } });
   if (!usuario) {
-    throw new HttpError(400, "No se pudo restablecer la contraseña, solicita un nuevo código");
+    throw new ErrorHttp(400, "No se pudo restablecer la contraseña, solicita un nuevo código");
   }
 
   const hashContrasena = await bcrypt.hash(entrada.newPassword, RONDAS_SAL_CONTRASENA);
@@ -344,11 +344,11 @@ export async function confirmarRestablecerContrasena(entrada: EntradaConfirmarRe
     }),
   ]);
 
-  await recordAudit({ userId: usuario.id, category: "SESION", action: "password_reset_confirmed" });
+  await registrarAuditoria({ userId: usuario.id, category: "SESION", action: "password_reset_confirmed" });
 }
 
-export async function cerrarSesion(refreshToken: string, metaSolicitud: RequestMeta) {
-  const hashDelToken = hashToken(refreshToken);
+export async function cerrarSesion(refreshToken: string, metaSolicitud: MetaSolicitud) {
+  const hashDelToken = hashearToken(refreshToken);
   const guardado = await prisma.refreshToken.findUnique({ where: { tokenHash: hashDelToken } });
 
   await prisma.refreshToken.updateMany({
@@ -357,6 +357,6 @@ export async function cerrarSesion(refreshToken: string, metaSolicitud: RequestM
   });
 
   if (guardado?.userId) {
-    await recordAudit({ userId: guardado.userId, category: "SESION", action: "logout", meta: metaSolicitud });
+    await registrarAuditoria({ userId: guardado.userId, category: "SESION", action: "logout", meta: metaSolicitud });
   }
 }

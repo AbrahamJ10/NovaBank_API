@@ -1,11 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../libreria/prisma";
-import { HttpError } from "../../intermediarios/manejadorErrores";
-import { recordTransaction } from "../transacciones/transacciones.servicio";
-import { verifyProfileOtp } from "../verificacion/otp.servicio";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
+import { registrarTransaccion } from "../transacciones/transacciones.servicio";
+import { verificarOtpPerfil } from "../verificacion/otp.servicio";
 import { cifrar, descifrar } from "../../libreria/criptografia";
-import { recordAudit } from "../auditoria/auditoria.servicio";
-import type { RequestMeta } from "../../libreria/metaSolicitud";
+import { registrarAuditoria } from "../auditoria/auditoria.servicio";
+import type { MetaSolicitud } from "../../libreria/metaSolicitud";
 
 // Una pequeña línea de crédito inicial para que una cuenta nueva no quede
 // atascada en cero por todos lados — es solo un número del libro contable
@@ -83,12 +83,12 @@ export async function crearCuentaParaUsuario(db: Db, idUsuario: string) {
       throw error;
     }
   }
-  throw new HttpError(500, "No se pudo crear la cuenta, intenta de nuevo");
+  throw new ErrorHttp(500, "No se pudo crear la cuenta, intenta de nuevo");
 }
 
 export async function obtenerResumenCuenta(idUsuario: string) {
   const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
-  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
 
   const deudaTarjeta = Number(cuenta.cardDebt);
   const pagoMinimo = deudaTarjeta > 0 ? Math.round(Math.max(deudaTarjeta * 0.05, 20) * 100) / 100 : 0;
@@ -113,25 +113,25 @@ export async function obtenerResumenCuenta(idUsuario: string) {
 // perfil (ver profile.service.ts) — el CVV solo se puede leer después de
 // probar control sobre el correo verificado de la cuenta, la misma barrera
 // que cambiar la contraseña.
-export async function revelarCvv(idUsuario: string, codigoOtp: string, metaSolicitud?: RequestMeta) {
+export async function revelarCvv(idUsuario: string, codigoOtp: string, metaSolicitud?: MetaSolicitud) {
   const [usuario, cuenta] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: idUsuario } }),
     prisma.account.findUnique({ where: { userId: idUsuario } }),
   ]);
-  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
 
-  await verifyProfileOtp(usuario.email, codigoOtp);
+  await verificarOtpPerfil(usuario.email, codigoOtp);
 
-  await recordAudit({ userId: idUsuario, category: "TARJETA", action: "cvv_revealed", meta: metaSolicitud });
+  await registrarAuditoria({ userId: idUsuario, category: "TARJETA", action: "cvv_revealed", meta: metaSolicitud });
 
   return { cvv: descifrar(cuenta.cardCvv) };
 }
 
-export async function establecerBloqueoTarjeta(idUsuario: string, bloqueada: boolean, metaSolicitud?: RequestMeta) {
+export async function establecerBloqueoTarjeta(idUsuario: string, bloqueada: boolean, metaSolicitud?: MetaSolicitud) {
   const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
-  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
   const actualizada = await prisma.account.update({ where: { userId: idUsuario }, data: { cardBlocked: bloqueada } });
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "TARJETA",
     action: bloqueada ? "card_blocked" : "card_unblocked",
@@ -140,15 +140,15 @@ export async function establecerBloqueoTarjeta(idUsuario: string, bloqueada: boo
   return actualizada.cardBlocked;
 }
 
-export async function pagarTarjeta(idUsuario: string, monto: number, metaSolicitud?: RequestMeta) {
+export async function pagarTarjeta(idUsuario: string, monto: number, metaSolicitud?: MetaSolicitud) {
   const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
-  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
 
-  if (monto <= 0) throw new HttpError(400, "El monto debe ser mayor a cero");
+  if (monto <= 0) throw new ErrorHttp(400, "El monto debe ser mayor a cero");
   const deudaTarjeta = Number(cuenta.cardDebt);
-  if (monto > deudaTarjeta) throw new HttpError(400, "El monto supera tu deuda actual");
+  if (monto > deudaTarjeta) throw new ErrorHttp(400, "El monto supera tu deuda actual");
   if (Number(cuenta.availableBalance) < monto) {
-    await recordAudit({
+    await registrarAuditoria({
       userId: idUsuario,
       category: "TARJETA",
       action: "card_payment_failed_insufficient_balance",
@@ -156,7 +156,7 @@ export async function pagarTarjeta(idUsuario: string, monto: number, metaSolicit
       metadata: { amount: monto },
       meta: metaSolicitud,
     });
-    throw new HttpError(400, "Saldo insuficiente");
+    throw new ErrorHttp(400, "Saldo insuficiente");
   }
 
   await prisma.$transaction(async (tx) => {
@@ -164,7 +164,7 @@ export async function pagarTarjeta(idUsuario: string, monto: number, metaSolicit
       where: { userId: idUsuario },
       data: { availableBalance: { decrement: monto }, cardDebt: { decrement: monto } },
     });
-    await recordTransaction(
+    await registrarTransaccion(
       tx,
       idUsuario,
       cuenta.id,
@@ -188,7 +188,7 @@ export async function pagarTarjeta(idUsuario: string, monto: number, metaSolicit
     );
   });
 
-  await recordAudit({ userId: idUsuario, category: "TARJETA", action: "card_payment_completed", metadata: { amount: monto }, meta: metaSolicitud });
+  await registrarAuditoria({ userId: idUsuario, category: "TARJETA", action: "card_payment_completed", metadata: { amount: monto }, meta: metaSolicitud });
 
   return obtenerResumenCuenta(idUsuario);
 }

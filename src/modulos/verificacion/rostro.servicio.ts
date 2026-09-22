@@ -1,5 +1,5 @@
 import { env } from "../../configuracion/entorno";
-import { HttpError } from "../../intermediarios/manejadorErrores";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
 
 export type FaceCompareResult = { matched: boolean; confidence: number; threshold: number };
 
@@ -26,7 +26,7 @@ function establecerCampoImagen(form: URLSearchParams, indice: 1 | 2, imagen: Ent
 // recomendada para casos de uso sensibles a la seguridad.
 export async function compareFaces(imagen1: EntradaImagen, imagen2: EntradaImagen): Promise<FaceCompareResult> {
   if (!env.FACEPP_API_KEY || !env.FACEPP_API_SECRET) {
-    throw new HttpError(503, "El servicio de verificación facial no está configurado");
+    throw new ErrorHttp(503, "El servicio de verificación facial no está configurado");
   }
 
   const form = new URLSearchParams();
@@ -45,11 +45,11 @@ export async function compareFaces(imagen1: EntradaImagen, imagen2: EntradaImage
 
   if (!respuesta.ok || typeof datos.error_message === "string") {
     console.error("Error de Face++:", respuesta.status, datos.error_message);
-    throw new HttpError(502, "El servicio de verificación facial no está disponible");
+    throw new ErrorHttp(502, "El servicio de verificación facial no está disponible");
   }
 
   if (typeof datos.confidence !== "number") {
-    throw new HttpError(422, "No se detectó un rostro claro en una de las fotos, intenta de nuevo con mejor iluminación");
+    throw new ErrorHttp(422, "No se detectó un rostro claro en una de las fotos, intenta de nuevo con mejor iluminación");
   }
 
   const umbrales = datos.thresholds as Record<string, number> | undefined;

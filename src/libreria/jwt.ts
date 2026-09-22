@@ -7,7 +7,7 @@ export interface AccessTokenPayload {
   email: string;
 }
 
-export function signAccessToken(payload: AccessTokenPayload): string {
+export function firmarTokenAcceso(payload: AccessTokenPayload): string {
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, { expiresIn: env.JWT_ACCESS_TTL as jwt.SignOptions["expiresIn"] });
 }
 
@@ -18,15 +18,15 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
 // Los refresh tokens son strings aleatorios opacos, no JWTs: solo se guarda
 // un hash de ellos del lado del servidor para que un volcado robado de la
 // base de datos no pueda reproducirse como una sesión válida.
-export function generateRefreshToken(): string {
+export function generarTokenRefresco(): string {
   return crypto.randomBytes(64).toString("hex");
 }
 
-export function hashToken(token: string): string {
+export function hashearToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-export function refreshTtlToDate(): Date {
+export function ttlRefrescoAFecha(): Date {
   const match = /^(\d+)([smhd])$/.exec(env.JWT_REFRESH_TTL);
   if (!match) throw new Error("Formato de JWT_REFRESH_TTL inválido");
   const value = Number(match[1]);

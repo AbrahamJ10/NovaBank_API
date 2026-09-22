@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { env } from "../configuracion/entorno";
 
-export class HttpError extends Error {
+export class ErrorHttp extends Error {
   constructor(public status: number, message: string, public details?: Record<string, unknown>) {
     super(message);
   }
@@ -21,7 +21,7 @@ export function errorHandler(error: unknown, _peticion: Request, respuesta: Resp
     return;
   }
 
-  if (error instanceof HttpError) {
+  if (error instanceof ErrorHttp) {
     respuesta.status(error.status).json({ error: error.message, ...(error.details ?? {}) });
     return;
   }

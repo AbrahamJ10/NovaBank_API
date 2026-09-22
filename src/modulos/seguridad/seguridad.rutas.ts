@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "../../intermediarios/requerirAutenticacion";
+import { requerirAutenticacion } from "../../intermediarios/requerirAutenticacion";
 import { asyncHandler } from "../../libreria/manejadorAsincrono";
 import {
   manejadorObtenerAlertas,
@@ -13,10 +13,10 @@ import {
 
 export const securityRouter = Router();
 
-securityRouter.get("/alerts", requireAuth, asyncHandler(manejadorObtenerAlertas));
-securityRouter.put("/alerts", requireAuth, asyncHandler(manejadorActualizarAlertas));
-securityRouter.get("/limits", requireAuth, asyncHandler(manejadorObtenerLimites));
-securityRouter.put("/limits", requireAuth, asyncHandler(manejadorActualizarLimites));
-securityRouter.post("/sessions", requireAuth, asyncHandler(manejadorListarSesiones));
-securityRouter.delete("/sessions/:id", requireAuth, asyncHandler(manejadorRevocarSesion));
-securityRouter.post("/sessions/revoke-others", requireAuth, asyncHandler(manejadorRevocarOtrasSesiones));
+securityRouter.get("/alerts", requerirAutenticacion, asyncHandler(manejadorObtenerAlertas));
+securityRouter.put("/alerts", requerirAutenticacion, asyncHandler(manejadorActualizarAlertas));
+securityRouter.get("/limits", requerirAutenticacion, asyncHandler(manejadorObtenerLimites));
+securityRouter.put("/limits", requerirAutenticacion, asyncHandler(manejadorActualizarLimites));
+securityRouter.post("/sessions", requerirAutenticacion, asyncHandler(manejadorListarSesiones));
+securityRouter.delete("/sessions/:id", requerirAutenticacion, asyncHandler(manejadorRevocarSesion));
+securityRouter.post("/sessions/revoke-others", requerirAutenticacion, asyncHandler(manejadorRevocarOtrasSesiones));

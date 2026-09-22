@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authLimiter, passwordResetLimiter } from "../../intermediarios/limiteTasa";
 import { asyncHandler } from "../../libreria/manejadorAsincrono";
-import { requireAuth } from "../../intermediarios/requerirAutenticacion";
+import { requerirAutenticacion } from "../../intermediarios/requerirAutenticacion";
 import {
   manejadorLoginFacial,
   manejadorLogin,
@@ -22,4 +22,4 @@ authRouter.post("/password-reset/request", passwordResetLimiter, asyncHandler(ma
 authRouter.post("/password-reset/confirm", authLimiter, asyncHandler(manejadorConfirmarRestablecerContrasena));
 authRouter.post("/refresh", authLimiter, asyncHandler(manejadorRefrescar));
 authRouter.post("/logout", asyncHandler(manejadorCerrarSesion));
-authRouter.get("/me", requireAuth, asyncHandler(manejadorPerfilPropio));
+authRouter.get("/me", requerirAutenticacion, asyncHandler(manejadorPerfilPropio));

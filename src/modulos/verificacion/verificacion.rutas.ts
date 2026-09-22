@@ -3,7 +3,7 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { asyncHandler } from "../../libreria/manejadorAsincrono";
 import { prisma } from "../../libreria/prisma";
-import { requestRegisterOtp } from "./otp.servicio";
+import { solicitarOtpRegistro } from "./otp.servicio";
 import { compareFaces } from "./rostro.servicio";
 
 // Los dos endpoints se ejecutan antes de que exista una cuenta, así que
@@ -41,7 +41,7 @@ verificationRouter.post(
   limitadorSolicitudOtp,
   asyncHandler(async (peticion, respuesta) => {
     const { email } = esquemaSolicitudOtp.parse(peticion.body);
-    await requestRegisterOtp(email);
+    await solicitarOtpRegistro(email);
     respuesta.status(204).send();
   })
 );

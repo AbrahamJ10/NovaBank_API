@@ -8,9 +8,9 @@ import {
   esquemaRegistro,
 } from "./autenticacion.validadores";
 import * as servicioAuth from "./autenticacion.servicio";
-import type { AuthenticatedRequest } from "../../intermediarios/requerirAutenticacion";
+import type { SolicitudAutenticada } from "../../intermediarios/requerirAutenticacion";
 import { prisma } from "../../libreria/prisma";
-import { getRequestMeta as obtenerMeta } from "../../libreria/metaSolicitud";
+import { obtenerMetaSolicitud as obtenerMeta } from "../../libreria/metaSolicitud";
 
 export async function manejadorRegistro(peticion: Request, respuesta: Response) {
   const entrada = esquemaRegistro.parse(peticion.body);
@@ -54,7 +54,7 @@ export async function manejadorCerrarSesion(peticion: Request, respuesta: Respon
   respuesta.status(204).send();
 }
 
-export async function manejadorPerfilPropio(peticion: AuthenticatedRequest, respuesta: Response) {
+export async function manejadorPerfilPropio(peticion: SolicitudAutenticada, respuesta: Response) {
   const usuario = await prisma.user.findUnique({ where: { id: peticion.user!.id } });
   if (!usuario) {
     respuesta.status(404).json({ error: "Usuario no encontrado" });

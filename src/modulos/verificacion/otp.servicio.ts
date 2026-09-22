@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { prisma } from "../../libreria/prisma";
-import { HttpError } from "../../intermediarios/manejadorErrores";
-import { sendEmail } from "./correo";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
+import { enviarCorreo } from "./correo";
 import type { OtpPurpose } from "@prisma/client";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -40,7 +40,7 @@ async function solicitarOtp(correo: string, proposito: OtpPurpose): Promise<void
   });
 
   const texto = TEXTO_CORREO[proposito];
-  await sendEmail(
+  await enviarCorreo(
     correo,
     texto.subject,
     `<div style="font-family:sans-serif;max-width:420px">
@@ -59,50 +59,50 @@ async function verificarOtp(correo: string, codigo: string, proposito: OtpPurpos
   });
 
   if (!otp) {
-    throw new HttpError(400, "El código expiró o no es válido, solicita uno nuevo");
+    throw new ErrorHttp(400, "El código expiró o no es válido, solicita uno nuevo");
   }
 
   if (otp.attempts >= MAX_INTENTOS) {
     await prisma.emailOtp.update({ where: { id: otp.id }, data: { consumedAt: new Date() } });
-    throw new HttpError(429, "Demasiados intentos, solicita un nuevo código");
+    throw new ErrorHttp(429, "Demasiados intentos, solicita un nuevo código");
   }
 
   if (hashDeCodigo(codigo) !== otp.codeHash) {
     await prisma.emailOtp.update({ where: { id: otp.id }, data: { attempts: otp.attempts + 1 } });
-    throw new HttpError(400, "Código incorrecto");
+    throw new ErrorHttp(400, "Código incorrecto");
   }
 
   await prisma.emailOtp.update({ where: { id: otp.id }, data: { consumedAt: new Date() } });
 }
 
-export async function requestRegisterOtp(correo: string): Promise<void> {
+export async function solicitarOtpRegistro(correo: string): Promise<void> {
   await solicitarOtp(correo, "REGISTER");
 }
 
-export async function verifyRegisterOtp(correo: string, codigo: string): Promise<void> {
+export async function verificarOtpRegistro(correo: string, codigo: string): Promise<void> {
   await verificarOtp(correo, codigo, "REGISTER");
 }
 
-export async function requestPasswordResetOtp(correo: string): Promise<void> {
+export async function solicitarOtpRestablecerContrasena(correo: string): Promise<void> {
   await solicitarOtp(correo, "PASSWORD_RESET");
 }
 
-export async function verifyPasswordResetOtp(correo: string, codigo: string): Promise<void> {
+export async function verificarOtpRestablecerContrasena(correo: string, codigo: string): Promise<void> {
   await verificarOtp(correo, codigo, "PASSWORD_RESET");
 }
 
-export async function requestTransferOtp(correo: string): Promise<void> {
+export async function solicitarOtpTransferencia(correo: string): Promise<void> {
   await solicitarOtp(correo, "TRANSFER");
 }
 
-export async function verifyTransferOtp(correo: string, codigo: string): Promise<void> {
+export async function verificarOtpTransferencia(correo: string, codigo: string): Promise<void> {
   await verificarOtp(correo, codigo, "TRANSFER");
 }
 
-export async function requestProfileOtp(correo: string): Promise<void> {
+export async function solicitarOtpPerfil(correo: string): Promise<void> {
   await solicitarOtp(correo, "PROFILE_UPDATE");
 }
 
-export async function verifyProfileOtp(correo: string, codigo: string): Promise<void> {
+export async function verificarOtpPerfil(correo: string, codigo: string): Promise<void> {
   await verificarOtp(correo, codigo, "PROFILE_UPDATE");
 }

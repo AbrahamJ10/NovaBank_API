@@ -1,6 +1,6 @@
 import { AuditCategory, Prisma } from "@prisma/client";
 import { prisma } from "../../libreria/prisma";
-import type { RequestMeta } from "../../libreria/metaSolicitud";
+import type { MetaSolicitud } from "../../libreria/metaSolicitud";
 
 export interface RecordAuditInput {
   userId?: string | null;
@@ -10,7 +10,7 @@ export interface RecordAuditInput {
   description?: string;
   metadata?: Record<string, unknown>;
   screen?: string;
-  meta?: RequestMeta;
+  meta?: MetaSolicitud;
 }
 
 // Se llama desde dentro del servicio que ejecuta la acción (transferencias,
@@ -19,7 +19,7 @@ export interface RecordAuditInput {
 // bloquea ni hace fallar la operación de fondo: una escritura de auditoría
 // rota no debe tumbar una solicitud real de movimiento de dinero, así que
 // los errores aquí solo se registran en el log.
-export async function recordAudit(entrada: RecordAuditInput): Promise<void> {
+export async function registrarAuditoria(entrada: RecordAuditInput): Promise<void> {
   try {
     await prisma.auditLog.create({
       data: {
@@ -58,7 +58,7 @@ export interface ClientAuditEvent {
 // servidor. createdAt siempre es la hora de recepción del servidor (nunca
 // confía en una marca de tiempo que envíe el cliente) para que el rastro
 // no pueda ser adulterado con fecha falsa por un cliente manipulado.
-export async function recordClientEvents(idUsuario: string, eventos: ClientAuditEvent[], metaSolicitud: RequestMeta): Promise<void> {
+export async function recordClientEvents(idUsuario: string, eventos: ClientAuditEvent[], metaSolicitud: MetaSolicitud): Promise<void> {
   if (eventos.length === 0) return;
 
   const filas: Prisma.AuditLogCreateManyInput[] = eventos.map((e) => ({

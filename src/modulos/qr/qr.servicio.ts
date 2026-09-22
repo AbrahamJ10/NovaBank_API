@@ -1,18 +1,18 @@
 import { prisma } from "../../libreria/prisma";
-import { HttpError } from "../../intermediarios/manejadorErrores";
-import { recordTransaction } from "../transacciones/transacciones.servicio";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
+import { registrarTransaccion } from "../transacciones/transacciones.servicio";
 import type { EntradaPagoQr } from "./qr.validadores";
-import { recordAudit } from "../auditoria/auditoria.servicio";
-import type { RequestMeta } from "../../libreria/metaSolicitud";
+import { registrarAuditoria } from "../auditoria/auditoria.servicio";
+import type { MetaSolicitud } from "../../libreria/metaSolicitud";
 
-export async function pagarQr(idUsuario: string, entrada: EntradaPagoQr, metaSolicitud?: RequestMeta) {
+export async function pagarQr(idUsuario: string, entrada: EntradaPagoQr, metaSolicitud?: MetaSolicitud) {
   const [cuenta, usuario] = await Promise.all([
     prisma.account.findUnique({ where: { userId: idUsuario } }),
     prisma.user.findUniqueOrThrow({ where: { id: idUsuario } }),
   ]);
-  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
   if (Number(cuenta.availableBalance) < entrada.amount) {
-    await recordAudit({
+    await registrarAuditoria({
       userId: idUsuario,
       category: "QR",
       action: "qr_payment_failed_insufficient_balance",
@@ -20,12 +20,12 @@ export async function pagarQr(idUsuario: string, entrada: EntradaPagoQr, metaSol
       metadata: { merchant: entrada.merchant, amount: entrada.amount },
       meta: metaSolicitud,
     });
-    throw new HttpError(400, "Saldo insuficiente");
+    throw new ErrorHttp(400, "Saldo insuficiente");
   }
 
   const transaccion = await prisma.$transaction(async (tx) => {
     await tx.account.update({ where: { userId: idUsuario }, data: { availableBalance: { decrement: entrada.amount } } });
-    return recordTransaction(
+    return registrarTransaccion(
       tx,
       idUsuario,
       cuenta.id,
@@ -51,7 +51,7 @@ export async function pagarQr(idUsuario: string, entrada: EntradaPagoQr, metaSol
     );
   });
 
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "QR",
     action: "qr_payment_completed",

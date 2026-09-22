@@ -1,6 +1,6 @@
 import { Prisma, TransactionCategory, TransactionKind } from "@prisma/client";
 import { prisma } from "../../libreria/prisma";
-import { createNotification, NotificationInput } from "../notificaciones/notificaciones.servicio";
+import { crearNotificacion, NotificationInput } from "../notificaciones/notificaciones.servicio";
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
@@ -24,7 +24,7 @@ export type NuevaEntradaTransaccion = {
 // preferencia de notificación del usuario (ver User.alertPurchase/
 // alertWithdraw) pasa null para omitirla ahí, mientras que la transacción
 // en sí siempre se registra.
-export async function recordTransaction(
+export async function registrarTransaccion(
   db: Db,
   idUsuario: string,
   idCuenta: string,
@@ -45,7 +45,7 @@ export async function recordTransaction(
     },
   });
   if (notificacion) {
-    await createNotification(db, idUsuario, notificacion);
+    await crearNotificacion(db, idUsuario, notificacion);
   }
   return transaccion;
 }

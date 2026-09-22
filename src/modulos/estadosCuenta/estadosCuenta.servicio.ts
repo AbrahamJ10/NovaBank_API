@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import { prisma } from "../../libreria/prisma";
-import { HttpError } from "../../intermediarios/manejadorErrores";
-import { sendEmail } from "../verificacion/correo";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
+import { enviarCorreo } from "../verificacion/correo";
 import type { EntradaEnviarEstadoCuenta } from "./estadosCuenta.validadores";
 
 const NOMBRES_MES_ES = [
@@ -94,7 +94,7 @@ export async function enviarEstadoCuenta(idUsuario: string, entrada: EntradaEnvi
     prisma.user.findUniqueOrThrow({ where: { id: idUsuario } }),
     prisma.account.findUnique({ where: { userId: idUsuario } }),
   ]);
-  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
 
   const inicio = new Date(Date.UTC(entrada.year, entrada.month - 1, 1));
   const fin = new Date(Date.UTC(entrada.year, entrada.month, 1));
@@ -126,7 +126,7 @@ export async function enviarEstadoCuenta(idUsuario: string, entrada: EntradaEnvi
   });
 
   const etiquetaMes = `${NOMBRES_MES_ES[entrada.month - 1]} ${entrada.year}`;
-  await sendEmail(
+  await enviarCorreo(
     usuario.email,
     `Tu estado de cuenta de ${etiquetaMes}`,
     `<div style="font-family:sans-serif;max-width:420px">

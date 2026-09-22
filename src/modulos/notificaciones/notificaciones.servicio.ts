@@ -15,7 +15,7 @@ export type NotificationInput = {
 // transacción real, se dispara un evento de seguridad) — recibe un cliente
 // db/tx para poder crearse de forma atómica junto con lo que la haya
 // disparado.
-export async function createNotification(db: Db, idUsuario: string, entrada: NotificationInput) {
+export async function crearNotificacion(db: Db, idUsuario: string, entrada: NotificationInput) {
   return db.notification.create({ data: { userId: idUsuario, ...entrada } });
 }
 

@@ -1,10 +1,10 @@
 import { Response } from "express";
 import { z } from "zod";
-import type { AuthenticatedRequest } from "../../intermediarios/requerirAutenticacion";
+import type { SolicitudAutenticada } from "../../intermediarios/requerirAutenticacion";
 import * as servicioTransferencias from "./transferencias.servicio";
-import { getRequestMeta } from "../../libreria/metaSolicitud";
+import { obtenerMetaSolicitud } from "../../libreria/metaSolicitud";
 
-export async function manejadorSolicitarOtpTransferencia(peticion: AuthenticatedRequest, respuesta: Response) {
+export async function manejadorSolicitarOtpTransferencia(peticion: SolicitudAutenticada, respuesta: Response) {
   await servicioTransferencias.solicitarTransferencia(peticion.user!.email);
   respuesta.status(204).send();
 }
@@ -16,8 +16,8 @@ const esquemaEjecutar = z.object({
   otpCode: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos"),
 });
 
-export async function manejadorEjecutarTransferencia(peticion: AuthenticatedRequest, respuesta: Response) {
+export async function manejadorEjecutarTransferencia(peticion: SolicitudAutenticada, respuesta: Response) {
   const entrada = esquemaEjecutar.parse(peticion.body);
-  const recibo = await servicioTransferencias.ejecutarTransferencia(peticion.user!.id, peticion.user!.email, entrada, getRequestMeta(peticion));
+  const recibo = await servicioTransferencias.ejecutarTransferencia(peticion.user!.id, peticion.user!.email, entrada, obtenerMetaSolicitud(peticion));
   respuesta.status(201).json(recibo);
 }

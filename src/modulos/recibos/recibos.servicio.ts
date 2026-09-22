@@ -1,9 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../libreria/prisma";
-import { HttpError } from "../../intermediarios/manejadorErrores";
-import { recordTransaction } from "../transacciones/transacciones.servicio";
-import { recordAudit } from "../auditoria/auditoria.servicio";
-import type { RequestMeta } from "../../libreria/metaSolicitud";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
+import { registrarTransaccion } from "../transacciones/transacciones.servicio";
+import { registrarAuditoria } from "../auditoria/auditoria.servicio";
+import type { MetaSolicitud } from "../../libreria/metaSolicitud";
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
@@ -85,12 +85,12 @@ export async function sembrarRecibosPorDefecto(db: Db, idUsuario: string) {
   }
 }
 
-export async function afiliarServicio(idUsuario: string, claveProveedor: string, numeroSuministroCrudo: string, metaSolicitud?: RequestMeta) {
+export async function afiliarServicio(idUsuario: string, claveProveedor: string, numeroSuministroCrudo: string, metaSolicitud?: MetaSolicitud) {
   const proveedor = await buscarProveedor(claveProveedor);
-  if (!proveedor) throw new HttpError(404, "Servicio no encontrado en el catálogo");
+  if (!proveedor) throw new ErrorHttp(404, "Servicio no encontrado en el catálogo");
 
   const numeroSuministro = numeroSuministroCrudo.trim();
-  if (!numeroSuministro) throw new HttpError(400, "Ingresa el dato solicitado");
+  if (!numeroSuministro) throw new ErrorHttp(400, "Ingresa el dato solicitado");
 
   const existente = await prisma.bill.findUnique({
     where: { userId_billerKey_supplyNumber: { userId: idUsuario, billerKey: claveProveedor, supplyNumber: numeroSuministro } },
@@ -98,7 +98,7 @@ export async function afiliarServicio(idUsuario: string, claveProveedor: string,
   if (existente) return aReciboPublico(existente); // ya estaba afiliado — volver a consultarlo es idempotente
 
   const creado = await crearAfiliacion(prisma, idUsuario, proveedor, numeroSuministro);
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "PAGO_SERVICIO",
     action: "bill_affiliated",
@@ -133,18 +133,18 @@ export async function listarRecibos(idUsuario: string) {
   return actualizados.map(aReciboPublico);
 }
 
-export async function pagarRecibo(idUsuario: string, idRecibo: string, metaSolicitud?: RequestMeta) {
+export async function pagarRecibo(idUsuario: string, idRecibo: string, metaSolicitud?: MetaSolicitud) {
   const recibo = await prisma.bill.findFirst({ where: { id: idRecibo, userId: idUsuario } });
-  if (!recibo) throw new HttpError(404, "Servicio no encontrado");
-  if (recibo.suspended) throw new HttpError(409, "Este servicio está suspendido, reactívalo para pagarlo");
-  if (recibo.paid) throw new HttpError(409, "Este servicio ya fue pagado");
+  if (!recibo) throw new ErrorHttp(404, "Servicio no encontrado");
+  if (recibo.suspended) throw new ErrorHttp(409, "Este servicio está suspendido, reactívalo para pagarlo");
+  if (recibo.paid) throw new ErrorHttp(409, "Este servicio ya fue pagado");
 
   const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
-  if (!cuenta) throw new HttpError(404, "Cuenta no encontrada");
+  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
 
   const monto = Number(recibo.amount);
   if (Number(cuenta.availableBalance) < monto) {
-    await recordAudit({
+    await registrarAuditoria({
       userId: idUsuario,
       category: "PAGO_SERVICIO",
       action: "bill_payment_failed_insufficient_balance",
@@ -152,13 +152,13 @@ export async function pagarRecibo(idUsuario: string, idRecibo: string, metaSolic
       metadata: { billId: recibo.id, billerKey: recibo.billerKey, billName: recibo.name, amount: monto },
       meta: metaSolicitud,
     });
-    throw new HttpError(400, "Saldo insuficiente");
+    throw new ErrorHttp(400, "Saldo insuficiente");
   }
 
   await prisma.$transaction(async (tx) => {
     await tx.account.update({ where: { userId: idUsuario }, data: { availableBalance: { decrement: monto } } });
     await tx.bill.update({ where: { id: recibo.id }, data: { paid: true, paidAt: new Date() } });
-    await recordTransaction(
+    await registrarTransaccion(
       tx,
       idUsuario,
       cuenta.id,
@@ -182,7 +182,7 @@ export async function pagarRecibo(idUsuario: string, idRecibo: string, metaSolic
     );
   });
 
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "PAGO_SERVICIO",
     action: "bill_paid",
@@ -191,12 +191,12 @@ export async function pagarRecibo(idUsuario: string, idRecibo: string, metaSolic
   });
 }
 
-export async function suspenderServicio(idUsuario: string, idRecibo: string, metaSolicitud?: RequestMeta) {
+export async function suspenderServicio(idUsuario: string, idRecibo: string, metaSolicitud?: MetaSolicitud) {
   const recibo = await prisma.bill.findFirst({ where: { id: idRecibo, userId: idUsuario } });
-  if (!recibo) throw new HttpError(404, "Servicio no encontrado");
-  if (recibo.suspended) throw new HttpError(409, "Este servicio ya está suspendido");
+  if (!recibo) throw new ErrorHttp(404, "Servicio no encontrado");
+  if (recibo.suspended) throw new ErrorHttp(409, "Este servicio ya está suspendido");
   const actualizado = await prisma.bill.update({ where: { id: recibo.id }, data: { suspended: true } });
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "PAGO_SERVICIO",
     action: "bill_suspended",
@@ -206,12 +206,12 @@ export async function suspenderServicio(idUsuario: string, idRecibo: string, met
   return aReciboPublico(actualizado);
 }
 
-export async function reanudarServicio(idUsuario: string, idRecibo: string, metaSolicitud?: RequestMeta) {
+export async function reanudarServicio(idUsuario: string, idRecibo: string, metaSolicitud?: MetaSolicitud) {
   const recibo = await prisma.bill.findFirst({ where: { id: idRecibo, userId: idUsuario } });
-  if (!recibo) throw new HttpError(404, "Servicio no encontrado");
-  if (!recibo.suspended) throw new HttpError(409, "Este servicio no está suspendido");
+  if (!recibo) throw new ErrorHttp(404, "Servicio no encontrado");
+  if (!recibo.suspended) throw new ErrorHttp(409, "Este servicio no está suspendido");
   const actualizado = await prisma.bill.update({ where: { id: recibo.id }, data: { suspended: false } });
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "PAGO_SERVICIO",
     action: "bill_resumed",

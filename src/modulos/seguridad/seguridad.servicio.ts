@@ -1,16 +1,16 @@
 import { prisma } from "../../libreria/prisma";
-import { HttpError } from "../../intermediarios/manejadorErrores";
-import { hashToken } from "../../libreria/jwt";
+import { ErrorHttp } from "../../intermediarios/manejadorErrores";
+import { hashearToken } from "../../libreria/jwt";
 import type { EntradaActualizarAlertas, EntradaActualizarLimites } from "./seguridad.validadores";
-import { recordAudit } from "../auditoria/auditoria.servicio";
-import type { RequestMeta } from "../../libreria/metaSolicitud";
+import { registrarAuditoria } from "../auditoria/auditoria.servicio";
+import type { MetaSolicitud } from "../../libreria/metaSolicitud";
 
 export async function obtenerAlertas(idUsuario: string) {
   const usuario = await prisma.user.findUniqueOrThrow({ where: { id: idUsuario } });
   return { compra: usuario.alertPurchase, retiro: usuario.alertWithdraw, login: usuario.alertLogin, promo: usuario.alertPromo };
 }
 
-export async function actualizarAlertas(idUsuario: string, entrada: EntradaActualizarAlertas, metaSolicitud?: RequestMeta) {
+export async function actualizarAlertas(idUsuario: string, entrada: EntradaActualizarAlertas, metaSolicitud?: MetaSolicitud) {
   const actualizado = await prisma.user.update({
     where: { id: idUsuario },
     data: {
@@ -20,7 +20,7 @@ export async function actualizarAlertas(idUsuario: string, entrada: EntradaActua
       alertPromo: entrada.promo,
     },
   });
-  await recordAudit({ userId: idUsuario, category: "SEGURIDAD", action: "alerts_updated", metadata: { ...entrada }, meta: metaSolicitud });
+  await registrarAuditoria({ userId: idUsuario, category: "SEGURIDAD", action: "alerts_updated", metadata: { ...entrada }, meta: metaSolicitud });
   return { compra: actualizado.alertPurchase, retiro: actualizado.alertWithdraw, login: actualizado.alertLogin, promo: actualizado.alertPromo };
 }
 
@@ -34,7 +34,7 @@ export async function obtenerLimites(idUsuario: string) {
   };
 }
 
-export async function actualizarLimites(idUsuario: string, entrada: EntradaActualizarLimites, metaSolicitud?: RequestMeta) {
+export async function actualizarLimites(idUsuario: string, entrada: EntradaActualizarLimites, metaSolicitud?: MetaSolicitud) {
   const actualizada = await prisma.account.update({
     where: { userId: idUsuario },
     data: {
@@ -44,7 +44,7 @@ export async function actualizarLimites(idUsuario: string, entrada: EntradaActua
       geoIntl: entrada.geoIntl,
     },
   });
-  await recordAudit({ userId: idUsuario, category: "SEGURIDAD", action: "limits_updated", metadata: { ...entrada }, meta: metaSolicitud });
+  await registrarAuditoria({ userId: idUsuario, category: "SEGURIDAD", action: "limits_updated", metadata: { ...entrada }, meta: metaSolicitud });
   return {
     limitOnline: Number(actualizada.limitOnline),
     limitAtm: Number(actualizada.limitAtm),
@@ -62,7 +62,7 @@ function describirDispositivo(userAgent: string | null): string {
 }
 
 export async function listarSesiones(idUsuario: string, refreshTokenActual?: string) {
-  const hashActual = refreshTokenActual ? hashToken(refreshTokenActual) : null;
+  const hashActual = refreshTokenActual ? hashearToken(refreshTokenActual) : null;
   const sesiones = await prisma.refreshToken.findMany({
     where: { userId: idUsuario, revokedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
@@ -76,11 +76,11 @@ export async function listarSesiones(idUsuario: string, refreshTokenActual?: str
   }));
 }
 
-export async function revocarSesion(idUsuario: string, idSesion: string, metaSolicitud?: RequestMeta) {
+export async function revocarSesion(idUsuario: string, idSesion: string, metaSolicitud?: MetaSolicitud) {
   const sesion = await prisma.refreshToken.findFirst({ where: { id: idSesion, userId: idUsuario, revokedAt: null } });
-  if (!sesion) throw new HttpError(404, "Sesión no encontrada");
+  if (!sesion) throw new ErrorHttp(404, "Sesión no encontrada");
   await prisma.refreshToken.update({ where: { id: sesion.id }, data: { revokedAt: new Date() } });
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "SESION",
     action: "session_revoked",
@@ -89,13 +89,13 @@ export async function revocarSesion(idUsuario: string, idSesion: string, metaSol
   });
 }
 
-export async function revocarOtrasSesiones(idUsuario: string, refreshTokenActual: string, metaSolicitud?: RequestMeta) {
-  const hashActual = hashToken(refreshTokenActual);
+export async function revocarOtrasSesiones(idUsuario: string, refreshTokenActual: string, metaSolicitud?: MetaSolicitud) {
+  const hashActual = hashearToken(refreshTokenActual);
   const resultado = await prisma.refreshToken.updateMany({
     where: { userId: idUsuario, revokedAt: null, tokenHash: { not: hashActual } },
     data: { revokedAt: new Date() },
   });
-  await recordAudit({
+  await registrarAuditoria({
     userId: idUsuario,
     category: "SESION",
     action: "sessions_revoked_others",
