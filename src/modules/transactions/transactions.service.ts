@@ -4,7 +4,7 @@ import { createNotification, NotificationInput } from "../notifications/notifica
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
-export type NewTransactionInput = {
+export type NuevaEntradaTransaccion = {
   kind: TransactionKind;
   category: TransactionCategory;
   name: string;
@@ -19,48 +19,48 @@ export type NewTransactionInput = {
 // que mueva dinero (transferencia, pago de recibo, QR, retiro) debe llamar
 // a esto para que la fila del historial y su notificación se creen juntas,
 // de forma atómica, dentro del mismo cliente db/tx que el cambio de saldo
-// que las causó. La fila del historial nunca es opcional; `notification`
+// que las causó. La fila del historial nunca es opcional; `notificacion`
 // sí lo es — quien llama y cuya categoría está controlada por una
 // preferencia de notificación del usuario (ver User.alertPurchase/
 // alertWithdraw) pasa null para omitirla ahí, mientras que la transacción
 // en sí siempre se registra.
 export async function recordTransaction(
   db: Db,
-  userId: string,
-  accountId: string,
-  input: NewTransactionInput,
-  notification: NotificationInput | null
+  idUsuario: string,
+  idCuenta: string,
+  entrada: NuevaEntradaTransaccion,
+  notificacion: NotificationInput | null
 ) {
-  const transaction = await db.transaction.create({
+  const transaccion = await db.transaction.create({
     data: {
-      accountId,
-      kind: input.kind,
-      category: input.category,
-      name: input.name,
-      meta: input.meta,
-      amount: input.amount,
-      icon: input.icon,
-      iconBg: input.iconBg,
-      iconFg: input.iconFg,
+      accountId: idCuenta,
+      kind: entrada.kind,
+      category: entrada.category,
+      name: entrada.name,
+      meta: entrada.meta,
+      amount: entrada.amount,
+      icon: entrada.icon,
+      iconBg: entrada.iconBg,
+      iconFg: entrada.iconFg,
     },
   });
-  if (notification) {
-    await createNotification(db, userId, notification);
+  if (notificacion) {
+    await createNotification(db, idUsuario, notificacion);
   }
-  return transaction;
+  return transaccion;
 }
 
-export async function listTransactions(userId: string, limit = 50) {
-  const account = await prisma.account.findUnique({ where: { userId } });
-  if (!account) return [];
+export async function listarTransacciones(idUsuario: string, limite = 50) {
+  const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
+  if (!cuenta) return [];
 
-  const items = await prisma.transaction.findMany({
-    where: { accountId: account.id },
+  const elementos = await prisma.transaction.findMany({
+    where: { accountId: cuenta.id },
     orderBy: { createdAt: "desc" },
-    take: limit,
+    take: limite,
   });
 
-  return items.map((t) => ({
+  return elementos.map((t) => ({
     id: t.id,
     name: t.name,
     meta: t.meta,

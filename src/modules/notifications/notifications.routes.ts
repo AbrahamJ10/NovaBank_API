@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { requireAuth } from "../../middleware/requireAuth";
 import { asyncHandler } from "../../lib/asyncHandler";
-import { deleteAllHandler, listNotificationsHandler, markAllReadHandler, markReadHandler } from "./notifications.controller";
+import { manejadorEliminarTodas, manejadorListarNotificaciones, manejadorMarcarTodasLeidas, manejadorMarcarLeida } from "./notifications.controller";
 
 export const notificationsRouter = Router();
 
-notificationsRouter.get("/", requireAuth, asyncHandler(listNotificationsHandler));
-notificationsRouter.post("/read-all", requireAuth, asyncHandler(markAllReadHandler));
-notificationsRouter.post("/:id/read", requireAuth, asyncHandler(markReadHandler));
-notificationsRouter.delete("/", requireAuth, asyncHandler(deleteAllHandler));
+notificationsRouter.get("/", requireAuth, asyncHandler(manejadorListarNotificaciones));
+notificationsRouter.post("/read-all", requireAuth, asyncHandler(manejadorMarcarTodasLeidas));
+notificationsRouter.post("/:id/read", requireAuth, asyncHandler(manejadorMarcarLeida));
+notificationsRouter.delete("/", requireAuth, asyncHandler(manejadorEliminarTodas));

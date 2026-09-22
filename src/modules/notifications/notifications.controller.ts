@@ -1,29 +1,29 @@
 import { Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
-import * as notificationsService from "./notifications.service";
+import * as servicioNotificaciones from "./notifications.service";
 
-export async function listNotificationsHandler(req: AuthenticatedRequest, res: Response) {
-  const requested = Number(req.query.limit);
-  const limit = Number.isFinite(requested) && requested > 0 ? Math.min(requested, 200) : 50;
-  const items = await notificationsService.listNotifications(req.user!.id, limit);
-  res.json({ items });
+export async function manejadorListarNotificaciones(peticion: AuthenticatedRequest, respuesta: Response) {
+  const solicitado = Number(peticion.query.limit);
+  const limite = Number.isFinite(solicitado) && solicitado > 0 ? Math.min(solicitado, 200) : 50;
+  const items = await servicioNotificaciones.listarNotificaciones(peticion.user!.id, limite);
+  respuesta.json({ items });
 }
 
-export async function markAllReadHandler(req: AuthenticatedRequest, res: Response) {
-  await notificationsService.markAllRead(req.user!.id);
-  res.status(204).send();
+export async function manejadorMarcarTodasLeidas(peticion: AuthenticatedRequest, respuesta: Response) {
+  await servicioNotificaciones.marcarTodasLeidas(peticion.user!.id);
+  respuesta.status(204).send();
 }
 
-const paramsSchema = z.object({ id: z.string().uuid() });
+const esquemaParametros = z.object({ id: z.string().uuid() });
 
-export async function markReadHandler(req: AuthenticatedRequest, res: Response) {
-  const { id } = paramsSchema.parse(req.params);
-  await notificationsService.markRead(req.user!.id, id);
-  res.status(204).send();
+export async function manejadorMarcarLeida(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { id } = esquemaParametros.parse(peticion.params);
+  await servicioNotificaciones.marcarLeida(peticion.user!.id, id);
+  respuesta.status(204).send();
 }
 
-export async function deleteAllHandler(req: AuthenticatedRequest, res: Response) {
-  await notificationsService.deleteAll(req.user!.id);
-  res.status(204).send();
+export async function manejadorEliminarTodas(peticion: AuthenticatedRequest, respuesta: Response) {
+  await servicioNotificaciones.eliminarTodas(peticion.user!.id);
+  respuesta.status(204).send();
 }
