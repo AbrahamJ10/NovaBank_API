@@ -1,88 +1,88 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../middleware/errorHandler";
-import { requestProfileOtp as sendProfileOtp, verifyProfileOtp } from "../verification/otp.service";
-import type { UpdateEmailInput, UpdatePasswordInput, UpdatePhoneInput } from "./profile.validators";
+import { requestProfileOtp as enviarOtpPerfil, verifyProfileOtp } from "../verification/otp.service";
+import type { EntradaActualizarCorreo, EntradaActualizarContrasena, EntradaActualizarTelefono } from "./profile.validators";
 import { recordAudit } from "../audit/audit.service";
 import type { RequestMeta } from "../../lib/requestMeta";
 
-const PASSWORD_SALT_ROUNDS = 12;
+const RONDAS_SAL_CONTRASENA = 12;
 
-function toPublicUser(user: { id: string; email: string; fullName: string; phone: string | null; dni: string | null }) {
-  return { id: user.id, email: user.email, fullName: user.fullName, phone: user.phone, dni: user.dni };
+function aUsuarioPublico(usuario: { id: string; email: string; fullName: string; phone: string | null; dni: string | null }) {
+  return { id: usuario.id, email: usuario.email, fullName: usuario.fullName, phone: usuario.phone, dni: usuario.dni };
 }
 
 // Todo cambio de perfil (correo/teléfono/contraseña) se confirma con un
 // código enviado al correo ACTUAL verificado de la cuenta — prueba que
 // quien hace el cambio controla la cuenta ya registrada, sin importar cuál
 // campo esté cambiando.
-export async function requestProfileOtp(userId: string): Promise<void> {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-  await sendProfileOtp(user.email);
+export async function solicitarOtpPerfil(idUsuario: string): Promise<void> {
+  const usuario = await prisma.user.findUniqueOrThrow({ where: { id: idUsuario } });
+  await enviarOtpPerfil(usuario.email);
 }
 
-export async function updateEmail(userId: string, input: UpdateEmailInput, meta?: RequestMeta) {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+export async function actualizarCorreo(idUsuario: string, entrada: EntradaActualizarCorreo, metaSolicitud?: RequestMeta) {
+  const usuario = await prisma.user.findUniqueOrThrow({ where: { id: idUsuario } });
 
-  if (input.newEmail === user.email) {
+  if (entrada.newEmail === usuario.email) {
     throw new HttpError(400, "Ese ya es tu correo actual");
   }
 
-  const taken = await prisma.user.findUnique({ where: { email: input.newEmail } });
-  if (taken) {
+  const enUso = await prisma.user.findUnique({ where: { email: entrada.newEmail } });
+  if (enUso) {
     throw new HttpError(409, "Ese correo ya está en uso por otra cuenta");
   }
 
-  await verifyProfileOtp(user.email, input.otpCode);
+  await verifyProfileOtp(usuario.email, entrada.otpCode);
 
-  const updated = await prisma.user.update({ where: { id: userId }, data: { email: input.newEmail } });
+  const actualizado = await prisma.user.update({ where: { id: idUsuario }, data: { email: entrada.newEmail } });
   await recordAudit({
-    userId,
+    userId: idUsuario,
     category: "PERFIL",
     action: "email_updated",
-    metadata: { previousEmail: user.email, newEmail: input.newEmail },
-    meta,
+    metadata: { previousEmail: usuario.email, newEmail: entrada.newEmail },
+    meta: metaSolicitud,
   });
-  return toPublicUser(updated);
+  return aUsuarioPublico(actualizado);
 }
 
-export async function updatePhone(userId: string, input: UpdatePhoneInput, meta?: RequestMeta) {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+export async function actualizarTelefono(idUsuario: string, entrada: EntradaActualizarTelefono, metaSolicitud?: RequestMeta) {
+  const usuario = await prisma.user.findUniqueOrThrow({ where: { id: idUsuario } });
 
-  if (input.newPhone === user.phone) {
+  if (entrada.newPhone === usuario.phone) {
     throw new HttpError(400, "Ese ya es tu número actual");
   }
 
-  const taken = await prisma.user.findUnique({ where: { phone: input.newPhone } });
-  if (taken) {
+  const enUso = await prisma.user.findUnique({ where: { phone: entrada.newPhone } });
+  if (enUso) {
     throw new HttpError(409, "Ese número ya está en uso por otra cuenta");
   }
 
-  await verifyProfileOtp(user.email, input.otpCode);
+  await verifyProfileOtp(usuario.email, entrada.otpCode);
 
-  const updated = await prisma.user.update({ where: { id: userId }, data: { phone: input.newPhone } });
+  const actualizado = await prisma.user.update({ where: { id: idUsuario }, data: { phone: entrada.newPhone } });
   await recordAudit({
-    userId,
+    userId: idUsuario,
     category: "PERFIL",
     action: "phone_updated",
-    metadata: { previousPhone: user.phone, newPhone: input.newPhone },
-    meta,
+    metadata: { previousPhone: usuario.phone, newPhone: entrada.newPhone },
+    meta: metaSolicitud,
   });
-  return toPublicUser(updated);
+  return aUsuarioPublico(actualizado);
 }
 
-export async function updatePassword(userId: string, input: UpdatePasswordInput, meta?: RequestMeta): Promise<void> {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+export async function actualizarContrasena(idUsuario: string, entrada: EntradaActualizarContrasena, metaSolicitud?: RequestMeta): Promise<void> {
+  const usuario = await prisma.user.findUniqueOrThrow({ where: { id: idUsuario } });
 
-  const matches = await bcrypt.compare(input.currentPassword, user.passwordHash);
-  if (!matches) {
-    await recordAudit({ userId, category: "PERFIL", action: "password_update_failed_wrong_current", success: false, meta });
+  const coincide = await bcrypt.compare(entrada.currentPassword, usuario.passwordHash);
+  if (!coincide) {
+    await recordAudit({ userId: idUsuario, category: "PERFIL", action: "password_update_failed_wrong_current", success: false, meta: metaSolicitud });
     throw new HttpError(401, "Tu contraseña actual no es correcta");
   }
 
-  await verifyProfileOtp(user.email, input.otpCode);
+  await verifyProfileOtp(usuario.email, entrada.otpCode);
 
-  const passwordHash = await bcrypt.hash(input.newPassword, PASSWORD_SALT_ROUNDS);
-  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
-  await recordAudit({ userId, category: "PERFIL", action: "password_updated", meta });
+  const hashContrasena = await bcrypt.hash(entrada.newPassword, RONDAS_SAL_CONTRASENA);
+  await prisma.user.update({ where: { id: idUsuario }, data: { passwordHash: hashContrasena } });
+  await recordAudit({ userId: idUsuario, category: "PERFIL", action: "password_updated", meta: metaSolicitud });
 }

@@ -1,64 +1,64 @@
 import { Request, Response } from "express";
 import {
-  faceLoginSchema,
-  loginSchema,
-  passwordResetConfirmSchema,
-  passwordResetRequestSchema,
-  refreshSchema,
-  registerSchema,
+  esquemaLoginFacial,
+  esquemaLogin,
+  esquemaConfirmarRestablecerContrasena,
+  esquemaSolicitarRestablecerContrasena,
+  esquemaRefrescar,
+  esquemaRegistro,
 } from "./auth.validators";
-import * as authService from "./auth.service";
+import * as servicioAuth from "./auth.service";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
 import { prisma } from "../../lib/prisma";
-import { getRequestMeta as meta } from "../../lib/requestMeta";
+import { getRequestMeta as obtenerMeta } from "../../lib/requestMeta";
 
-export async function registerHandler(req: Request, res: Response) {
-  const input = registerSchema.parse(req.body);
-  const result = await authService.register(input, meta(req));
-  res.status(201).json(result);
+export async function manejadorRegistro(peticion: Request, respuesta: Response) {
+  const entrada = esquemaRegistro.parse(peticion.body);
+  const resultado = await servicioAuth.registrar(entrada, obtenerMeta(peticion));
+  respuesta.status(201).json(resultado);
 }
 
-export async function loginHandler(req: Request, res: Response) {
-  const input = loginSchema.parse(req.body);
-  const result = await authService.login(input, meta(req));
-  res.status(200).json(result);
+export async function manejadorLogin(peticion: Request, respuesta: Response) {
+  const entrada = esquemaLogin.parse(peticion.body);
+  const resultado = await servicioAuth.iniciarSesion(entrada, obtenerMeta(peticion));
+  respuesta.status(200).json(resultado);
 }
 
-export async function faceLoginHandler(req: Request, res: Response) {
-  const input = faceLoginSchema.parse(req.body);
-  const result = await authService.faceLogin(input, meta(req));
-  res.status(200).json(result);
+export async function manejadorLoginFacial(peticion: Request, respuesta: Response) {
+  const entrada = esquemaLoginFacial.parse(peticion.body);
+  const resultado = await servicioAuth.iniciarSesionConRostro(entrada, obtenerMeta(peticion));
+  respuesta.status(200).json(resultado);
 }
 
-export async function passwordResetRequestHandler(req: Request, res: Response) {
-  const input = passwordResetRequestSchema.parse(req.body);
-  await authService.requestPasswordReset(input);
-  res.status(204).send();
+export async function manejadorSolicitarRestablecerContrasena(peticion: Request, respuesta: Response) {
+  const entrada = esquemaSolicitarRestablecerContrasena.parse(peticion.body);
+  await servicioAuth.solicitarRestablecerContrasena(entrada);
+  respuesta.status(204).send();
 }
 
-export async function passwordResetConfirmHandler(req: Request, res: Response) {
-  const input = passwordResetConfirmSchema.parse(req.body);
-  await authService.confirmPasswordReset(input);
-  res.status(204).send();
+export async function manejadorConfirmarRestablecerContrasena(peticion: Request, respuesta: Response) {
+  const entrada = esquemaConfirmarRestablecerContrasena.parse(peticion.body);
+  await servicioAuth.confirmarRestablecerContrasena(entrada);
+  respuesta.status(204).send();
 }
 
-export async function refreshHandler(req: Request, res: Response) {
-  const { refreshToken } = refreshSchema.parse(req.body);
-  const result = await authService.refresh(refreshToken, meta(req));
-  res.status(200).json(result);
+export async function manejadorRefrescar(peticion: Request, respuesta: Response) {
+  const { refreshToken } = esquemaRefrescar.parse(peticion.body);
+  const resultado = await servicioAuth.refrescarSesion(refreshToken, obtenerMeta(peticion));
+  respuesta.status(200).json(resultado);
 }
 
-export async function logoutHandler(req: Request, res: Response) {
-  const { refreshToken } = refreshSchema.parse(req.body);
-  await authService.logout(refreshToken, meta(req));
-  res.status(204).send();
+export async function manejadorCerrarSesion(peticion: Request, respuesta: Response) {
+  const { refreshToken } = esquemaRefrescar.parse(peticion.body);
+  await servicioAuth.cerrarSesion(refreshToken, obtenerMeta(peticion));
+  respuesta.status(204).send();
 }
 
-export async function meHandler(req: AuthenticatedRequest, res: Response) {
-  const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
-  if (!user) {
-    res.status(404).json({ error: "Usuario no encontrado" });
+export async function manejadorPerfilPropio(peticion: AuthenticatedRequest, respuesta: Response) {
+  const usuario = await prisma.user.findUnique({ where: { id: peticion.user!.id } });
+  if (!usuario) {
+    respuesta.status(404).json({ error: "Usuario no encontrado" });
     return;
   }
-  res.json({ id: user.id, email: user.email, fullName: user.fullName, phone: user.phone, dni: user.dni });
+  respuesta.json({ id: usuario.id, email: usuario.email, fullName: usuario.fullName, phone: usuario.phone, dni: usuario.dni });
 }

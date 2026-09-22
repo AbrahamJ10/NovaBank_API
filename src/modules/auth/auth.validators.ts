@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { passwordSchema } from "../../lib/passwordPolicy";
+import { esquemaContrasena } from "../../lib/passwordPolicy";
 
-export const registerSchema = z.object({
+export const esquemaRegistro = z.object({
   email: z.string().trim().toLowerCase().email(),
-  password: passwordSchema,
+  password: esquemaContrasena,
   fullName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(6).max(20).optional(),
   dni: z.string().trim().min(6).max(15).optional(),
@@ -16,32 +16,32 @@ export const registerSchema = z.object({
   selfie: z.string().min(100).optional(),
 });
 
-export const loginSchema = z.object({
+export const esquemaLogin = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1),
 });
 
-export const faceLoginSchema = z.object({
+export const esquemaLoginFacial = z.object({
   email: z.string().trim().toLowerCase().email(),
   selfie: z.string().min(100),
 });
 
-export const refreshSchema = z.object({
+export const esquemaRefrescar = z.object({
   refreshToken: z.string().min(20),
 });
 
-export const passwordResetRequestSchema = z.object({
+export const esquemaSolicitarRestablecerContrasena = z.object({
   email: z.string().trim().toLowerCase().email(),
 });
 
-export const passwordResetConfirmSchema = z.object({
+export const esquemaConfirmarRestablecerContrasena = z.object({
   email: z.string().trim().toLowerCase().email(),
   code: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos"),
-  newPassword: passwordSchema,
+  newPassword: esquemaContrasena,
 });
 
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
-export type FaceLoginInput = z.infer<typeof faceLoginSchema>;
-export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
-export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema>;
+export type EntradaRegistro = z.infer<typeof esquemaRegistro>;
+export type EntradaLogin = z.infer<typeof esquemaLogin>;
+export type EntradaLoginFacial = z.infer<typeof esquemaLoginFacial>;
+export type EntradaSolicitarRestablecerContrasena = z.infer<typeof esquemaSolicitarRestablecerContrasena>;
+export type EntradaConfirmarRestablecerContrasena = z.infer<typeof esquemaConfirmarRestablecerContrasena>;

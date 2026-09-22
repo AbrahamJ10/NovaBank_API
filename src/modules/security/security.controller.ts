@@ -1,41 +1,41 @@
 import { Response } from "express";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
-import * as securityService from "./security.service";
-import { revokeSessionParamsSchema, sessionTokenSchema, updateAlertsSchema, updateLimitsSchema } from "./security.validators";
+import * as servicioSeguridad from "./security.service";
+import { esquemaParametrosRevocarSesion, esquemaTokenSesion, esquemaActualizarAlertas, esquemaActualizarLimites } from "./security.validators";
 import { getRequestMeta } from "../../lib/requestMeta";
 
-export async function getAlertsHandler(req: AuthenticatedRequest, res: Response) {
-  res.json(await securityService.getAlerts(req.user!.id));
+export async function manejadorObtenerAlertas(peticion: AuthenticatedRequest, respuesta: Response) {
+  respuesta.json(await servicioSeguridad.obtenerAlertas(peticion.user!.id));
 }
 
-export async function updateAlertsHandler(req: AuthenticatedRequest, res: Response) {
-  const input = updateAlertsSchema.parse(req.body);
-  res.json(await securityService.updateAlerts(req.user!.id, input, getRequestMeta(req)));
+export async function manejadorActualizarAlertas(peticion: AuthenticatedRequest, respuesta: Response) {
+  const entrada = esquemaActualizarAlertas.parse(peticion.body);
+  respuesta.json(await servicioSeguridad.actualizarAlertas(peticion.user!.id, entrada, getRequestMeta(peticion)));
 }
 
-export async function getLimitsHandler(req: AuthenticatedRequest, res: Response) {
-  res.json(await securityService.getLimits(req.user!.id));
+export async function manejadorObtenerLimites(peticion: AuthenticatedRequest, respuesta: Response) {
+  respuesta.json(await servicioSeguridad.obtenerLimites(peticion.user!.id));
 }
 
-export async function updateLimitsHandler(req: AuthenticatedRequest, res: Response) {
-  const input = updateLimitsSchema.parse(req.body);
-  res.json(await securityService.updateLimits(req.user!.id, input, getRequestMeta(req)));
+export async function manejadorActualizarLimites(peticion: AuthenticatedRequest, respuesta: Response) {
+  const entrada = esquemaActualizarLimites.parse(peticion.body);
+  respuesta.json(await servicioSeguridad.actualizarLimites(peticion.user!.id, entrada, getRequestMeta(peticion)));
 }
 
-export async function listSessionsHandler(req: AuthenticatedRequest, res: Response) {
-  const { refreshToken } = sessionTokenSchema.parse(req.body);
-  const items = await securityService.listSessions(req.user!.id, refreshToken);
-  res.json({ items });
+export async function manejadorListarSesiones(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { refreshToken } = esquemaTokenSesion.parse(peticion.body);
+  const items = await servicioSeguridad.listarSesiones(peticion.user!.id, refreshToken);
+  respuesta.json({ items });
 }
 
-export async function revokeSessionHandler(req: AuthenticatedRequest, res: Response) {
-  const { id } = revokeSessionParamsSchema.parse(req.params);
-  await securityService.revokeSession(req.user!.id, id, getRequestMeta(req));
-  res.status(204).send();
+export async function manejadorRevocarSesion(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { id } = esquemaParametrosRevocarSesion.parse(peticion.params);
+  await servicioSeguridad.revocarSesion(peticion.user!.id, id, getRequestMeta(peticion));
+  respuesta.status(204).send();
 }
 
-export async function revokeOtherSessionsHandler(req: AuthenticatedRequest, res: Response) {
-  const { refreshToken } = sessionTokenSchema.parse(req.body);
-  await securityService.revokeOtherSessions(req.user!.id, refreshToken, getRequestMeta(req));
-  res.status(204).send();
+export async function manejadorRevocarOtrasSesiones(peticion: AuthenticatedRequest, respuesta: Response) {
+  const { refreshToken } = esquemaTokenSesion.parse(peticion.body);
+  await servicioSeguridad.revocarOtrasSesiones(peticion.user!.id, refreshToken, getRequestMeta(peticion));
+  respuesta.status(204).send();
 }

@@ -1,24 +1,24 @@
 import { z } from "zod";
-import { passwordSchema } from "../../lib/passwordPolicy";
+import { esquemaContrasena } from "../../lib/passwordPolicy";
 
-const otpCode = z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos");
+const codigoOtp = z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos");
 
-export const updateEmailSchema = z.object({
+export const esquemaActualizarCorreo = z.object({
   newEmail: z.string().trim().toLowerCase().email("Correo inválido"),
-  otpCode,
+  otpCode: codigoOtp,
 });
 
-export const updatePhoneSchema = z.object({
+export const esquemaActualizarTelefono = z.object({
   newPhone: z.string().trim().regex(/^9\d{8}$/, "Ingresa un celular peruano válido (9 dígitos)"),
-  otpCode,
+  otpCode: codigoOtp,
 });
 
-export const updatePasswordSchema = z.object({
+export const esquemaActualizarContrasena = z.object({
   currentPassword: z.string().min(1, "Ingresa tu contraseña actual"),
-  newPassword: passwordSchema,
-  otpCode,
+  newPassword: esquemaContrasena,
+  otpCode: codigoOtp,
 });
 
-export type UpdateEmailInput = z.infer<typeof updateEmailSchema>;
-export type UpdatePhoneInput = z.infer<typeof updatePhoneSchema>;
-export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
+export type EntradaActualizarCorreo = z.infer<typeof esquemaActualizarCorreo>;
+export type EntradaActualizarTelefono = z.infer<typeof esquemaActualizarTelefono>;
+export type EntradaActualizarContrasena = z.infer<typeof esquemaActualizarContrasena>;

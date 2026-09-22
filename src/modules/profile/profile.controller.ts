@@ -1,28 +1,28 @@
 import { Response } from "express";
 import type { AuthenticatedRequest } from "../../middleware/requireAuth";
-import * as profileService from "./profile.service";
-import { updateEmailSchema, updatePasswordSchema, updatePhoneSchema } from "./profile.validators";
+import * as servicioPerfil from "./profile.service";
+import { esquemaActualizarCorreo, esquemaActualizarContrasena, esquemaActualizarTelefono } from "./profile.validators";
 import { getRequestMeta } from "../../lib/requestMeta";
 
-export async function requestProfileOtpHandler(req: AuthenticatedRequest, res: Response) {
-  await profileService.requestProfileOtp(req.user!.id);
-  res.status(204).send();
+export async function manejadorSolicitarOtpPerfil(peticion: AuthenticatedRequest, respuesta: Response) {
+  await servicioPerfil.solicitarOtpPerfil(peticion.user!.id);
+  respuesta.status(204).send();
 }
 
-export async function updateEmailHandler(req: AuthenticatedRequest, res: Response) {
-  const input = updateEmailSchema.parse(req.body);
-  const user = await profileService.updateEmail(req.user!.id, input, getRequestMeta(req));
-  res.json({ user });
+export async function manejadorActualizarCorreo(peticion: AuthenticatedRequest, respuesta: Response) {
+  const entrada = esquemaActualizarCorreo.parse(peticion.body);
+  const usuario = await servicioPerfil.actualizarCorreo(peticion.user!.id, entrada, getRequestMeta(peticion));
+  respuesta.json({ user: usuario });
 }
 
-export async function updatePhoneHandler(req: AuthenticatedRequest, res: Response) {
-  const input = updatePhoneSchema.parse(req.body);
-  const user = await profileService.updatePhone(req.user!.id, input, getRequestMeta(req));
-  res.json({ user });
+export async function manejadorActualizarTelefono(peticion: AuthenticatedRequest, respuesta: Response) {
+  const entrada = esquemaActualizarTelefono.parse(peticion.body);
+  const usuario = await servicioPerfil.actualizarTelefono(peticion.user!.id, entrada, getRequestMeta(peticion));
+  respuesta.json({ user: usuario });
 }
 
-export async function updatePasswordHandler(req: AuthenticatedRequest, res: Response) {
-  const input = updatePasswordSchema.parse(req.body);
-  await profileService.updatePassword(req.user!.id, input, getRequestMeta(req));
-  res.status(204).send();
+export async function manejadorActualizarContrasena(peticion: AuthenticatedRequest, respuesta: Response) {
+  const entrada = esquemaActualizarContrasena.parse(peticion.body);
+  await servicioPerfil.actualizarContrasena(peticion.user!.id, entrada, getRequestMeta(peticion));
+  respuesta.status(204).send();
 }
