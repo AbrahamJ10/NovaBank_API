@@ -13,7 +13,7 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
-    "cleanup": "tsx src/scripts/cleanup.ts"
+    "cleanup": "tsx src/scripts/limpieza.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
