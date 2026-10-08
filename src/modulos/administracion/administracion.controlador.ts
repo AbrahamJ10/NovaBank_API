@@ -70,24 +70,47 @@ export async function manejadorRestablecerContrasena(peticion: SolicitudAutentic
   respuesta.json(r);
 }
 
+function strParam(query: Request["query"], clave: string): string | undefined {
+  const valor = query[clave];
+  return typeof valor === "string" && valor.length > 0 ? valor : undefined;
+}
+
 export async function manejadorListarEventosLogin(peticion: Request, respuesta: Response) {
   const { pagina, limite } = esquemaPaginacion.parse(peticion.query);
-  const resultado = typeof peticion.query.resultado === "string" ? peticion.query.resultado : undefined;
-  const correo = typeof peticion.query.correo === "string" ? peticion.query.correo : undefined;
-  const datos = await servicioAdmin.listarEventosLogin({ resultado, correo, pagina, limite });
+  const datos = await servicioAdmin.listarEventosLogin({
+    resultado: strParam(peticion.query, "resultado"),
+    correo: strParam(peticion.query, "correo"),
+    ip: strParam(peticion.query, "ip"),
+    desde: strParam(peticion.query, "desde"),
+    hasta: strParam(peticion.query, "hasta"),
+    pagina, limite,
+  });
   respuesta.json(datos);
 }
 
 export async function manejadorListarAuditoria(peticion: Request, respuesta: Response) {
   const { pagina, limite } = esquemaPaginacion.parse(peticion.query);
-  const categoria = typeof peticion.query.categoria === "string" ? peticion.query.categoria : undefined;
-  const busqueda = typeof peticion.query.busqueda === "string" ? peticion.query.busqueda : undefined;
-  const datos = await servicioAdmin.listarAuditoriaGlobal({ categoria, busqueda, pagina, limite });
+  const datos = await servicioAdmin.listarAuditoriaGlobal({
+    categoria: strParam(peticion.query, "categoria"),
+    busqueda: strParam(peticion.query, "busqueda"),
+    ip: strParam(peticion.query, "ip"),
+    desde: strParam(peticion.query, "desde"),
+    hasta: strParam(peticion.query, "hasta"),
+    soloFallidos: strParam(peticion.query, "soloFallidos") === "1",
+    pagina, limite,
+  });
   respuesta.json(datos);
 }
 
 export async function manejadorListarTransaccionesGlobal(peticion: Request, respuesta: Response) {
   const { pagina, limite } = esquemaPaginacion.parse(peticion.query);
-  const datos = await servicioAdmin.listarTransaccionesGlobal({ pagina, limite });
+  const datos = await servicioAdmin.listarTransaccionesGlobal({
+    tipo: strParam(peticion.query, "tipo"),
+    categoria: strParam(peticion.query, "categoria"),
+    busqueda: strParam(peticion.query, "busqueda"),
+    desde: strParam(peticion.query, "desde"),
+    hasta: strParam(peticion.query, "hasta"),
+    pagina, limite,
+  });
   respuesta.json(datos);
 }

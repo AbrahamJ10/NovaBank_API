@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { Prisma, LoginEventResult, AuditCategory } from "@prisma/client";
+import { Prisma, LoginEventResult, AuditCategory, TransactionKind, TransactionCategory } from "@prisma/client";
 import { prisma } from "../../libreria/prisma";
 import { ErrorHttp } from "../../intermediarios/manejadorErrores";
 import { registrarAuditoria } from "../auditoria/auditoria.servicio";
@@ -263,11 +263,24 @@ export async function restablecerContrasenaUsuario(id: string, idAdmin: string, 
   return { temporaryPassword: nuevaContrasena };
 }
 
+function rangoFechas(desde?: string, hasta?: string): Prisma.DateTimeFilter | undefined {
+  if (!desde && !hasta) return undefined;
+  const filtro: Prisma.DateTimeFilter = {};
+  if (desde) filtro.gte = new Date(`${desde}T00:00:00.000Z`);
+  if (hasta) filtro.lte = new Date(`${hasta}T23:59:59.999Z`);
+  return filtro;
+}
+
 // ---------- Seguridad / auditoría globales ----------
-export async function listarEventosLogin(opts: { resultado?: string; correo?: string; pagina: number; limite: number }) {
+export async function listarEventosLogin(opts: {
+  resultado?: string; correo?: string; ip?: string; desde?: string; hasta?: string; pagina: number; limite: number;
+}) {
   const where: Prisma.LoginEventWhereInput = {};
   if (opts.resultado) where.result = opts.resultado as LoginEventResult;
   if (opts.correo) where.email = { contains: opts.correo, mode: "insensitive" };
+  if (opts.ip) where.ip = { contains: opts.ip };
+  const fechas = rangoFechas(opts.desde, opts.hasta);
+  if (fechas) where.createdAt = fechas;
 
   const [total, items] = await Promise.all([
     prisma.loginEvent.count({ where }),
@@ -289,7 +302,10 @@ export async function listarEventosLogin(opts: { resultado?: string; correo?: st
   };
 }
 
-export async function listarAuditoriaGlobal(opts: { categoria?: string; busqueda?: string; pagina: number; limite: number }) {
+export async function listarAuditoriaGlobal(opts: {
+  categoria?: string; busqueda?: string; soloFallidos?: boolean; ip?: string; desde?: string; hasta?: string;
+  pagina: number; limite: number;
+}) {
   const where: Prisma.AuditLogWhereInput = {};
   if (opts.categoria) where.category = opts.categoria as AuditCategory;
   if (opts.busqueda) {
@@ -299,6 +315,10 @@ export async function listarAuditoriaGlobal(opts: { categoria?: string; busqueda
       { user: { fullName: { contains: opts.busqueda, mode: "insensitive" } } },
     ];
   }
+  if (opts.soloFallidos) where.success = false;
+  if (opts.ip) where.ip = { contains: opts.ip };
+  const fechas = rangoFechas(opts.desde, opts.hasta);
+  if (fechas) where.createdAt = fechas;
 
   const [total, items] = await Promise.all([
     prisma.auditLog.count({ where }),
@@ -321,10 +341,29 @@ export async function listarAuditoriaGlobal(opts: { categoria?: string; busqueda
   };
 }
 
-export async function listarTransaccionesGlobal(opts: { pagina: number; limite: number }) {
+export async function listarTransaccionesGlobal(opts: {
+  tipo?: string; categoria?: string; busqueda?: string; desde?: string; hasta?: string; pagina: number; limite: number;
+}) {
+  const where: Prisma.TransactionWhereInput = {};
+  if (opts.tipo) where.kind = opts.tipo as TransactionKind;
+  if (opts.categoria) where.category = opts.categoria as TransactionCategory;
+  if (opts.busqueda) {
+    where.account = {
+      user: {
+        OR: [
+          { email: { contains: opts.busqueda, mode: "insensitive" } },
+          { fullName: { contains: opts.busqueda, mode: "insensitive" } },
+        ],
+      },
+    };
+  }
+  const fechas = rangoFechas(opts.desde, opts.hasta);
+  if (fechas) where.createdAt = fechas;
+
   const [total, items] = await Promise.all([
-    prisma.transaction.count(),
+    prisma.transaction.count({ where }),
     prisma.transaction.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       skip: (opts.pagina - 1) * opts.limite,
       take: opts.limite,
