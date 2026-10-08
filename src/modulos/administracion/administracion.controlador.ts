@@ -9,6 +9,18 @@ const esquemaPaginacion = z.object({
   limite: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+function strParam(query: Request["query"], clave: string): string | undefined {
+  const valor = query[clave];
+  return typeof valor === "string" && valor.length > 0 ? valor : undefined;
+}
+
+function numParam(query: Request["query"], clave: string): number | undefined {
+  const valor = strParam(query, clave);
+  if (valor === undefined) return undefined;
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export async function manejadorEstadisticas(_peticion: Request, respuesta: Response) {
   const datos = await servicioAdmin.obtenerEstadisticas();
   respuesta.json(datos);
@@ -16,9 +28,15 @@ export async function manejadorEstadisticas(_peticion: Request, respuesta: Respo
 
 export async function manejadorListarUsuarios(peticion: Request, respuesta: Response) {
   const { pagina, limite } = esquemaPaginacion.parse(peticion.query);
-  const busqueda = typeof peticion.query.busqueda === "string" ? peticion.query.busqueda : undefined;
-  const estado = typeof peticion.query.estado === "string" ? peticion.query.estado : undefined;
-  const datos = await servicioAdmin.listarUsuarios({ busqueda, estado, pagina, limite });
+  const datos = await servicioAdmin.listarUsuarios({
+    busqueda: strParam(peticion.query, "busqueda"),
+    estado: strParam(peticion.query, "estado"),
+    desde: strParam(peticion.query, "desde"),
+    hasta: strParam(peticion.query, "hasta"),
+    saldoMin: numParam(peticion.query, "saldoMin"),
+    saldoMax: numParam(peticion.query, "saldoMax"),
+    pagina, limite,
+  });
   respuesta.json(datos);
 }
 
@@ -68,11 +86,6 @@ export async function manejadorRestaurarUsuario(peticion: SolicitudAutenticada, 
 export async function manejadorRestablecerContrasena(peticion: SolicitudAutenticada, respuesta: Response) {
   const r = await servicioAdmin.restablecerContrasenaUsuario(peticion.params.id, peticion.user!.id, obtenerMetaSolicitud(peticion));
   respuesta.json(r);
-}
-
-function strParam(query: Request["query"], clave: string): string | undefined {
-  const valor = query[clave];
-  return typeof valor === "string" && valor.length > 0 ? valor : undefined;
 }
 
 export async function manejadorListarEventosLogin(peticion: Request, respuesta: Response) {

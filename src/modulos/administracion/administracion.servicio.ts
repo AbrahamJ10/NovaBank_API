@@ -89,7 +89,10 @@ export async function obtenerEstadisticas() {
 }
 
 // ---------- Usuarios ----------
-export async function listarUsuarios(opts: { busqueda?: string; estado?: string; pagina: number; limite: number }) {
+export async function listarUsuarios(opts: {
+  busqueda?: string; estado?: string; desde?: string; hasta?: string;
+  saldoMin?: number; saldoMax?: number; pagina: number; limite: number;
+}) {
   const where: Prisma.UserWhereInput = { role: "CLIENTE" };
 
   if (opts.busqueda) {
@@ -113,6 +116,18 @@ export async function listarUsuarios(opts: { busqueda?: string; estado?: string;
     where.deletedAt = { not: null };
   } else {
     where.deletedAt = null;
+  }
+
+  const fechas = rangoFechas(opts.desde, opts.hasta);
+  if (fechas) where.createdAt = fechas;
+
+  if (opts.saldoMin != null || opts.saldoMax != null) {
+    where.account = {
+      availableBalance: {
+        ...(opts.saldoMin != null ? { gte: opts.saldoMin } : {}),
+        ...(opts.saldoMax != null ? { lte: opts.saldoMax } : {}),
+      },
+    };
   }
 
   const [total, usuarios] = await Promise.all([
