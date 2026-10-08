@@ -28,8 +28,8 @@ const MAX_INTENTOS_FALLIDOS = 5;
 const DURACION_BLOQUEO_MS = 15 * 60 * 1000;
 const RONDAS_SAL_CONTRASENA = 12;
 
-function aUsuarioPublico(usuario: { id: string; email: string; fullName: string; phone: string | null; dni: string | null }) {
-  return { id: usuario.id, email: usuario.email, fullName: usuario.fullName, phone: usuario.phone, dni: usuario.dni };
+function aUsuarioPublico(usuario: { id: string; email: string; fullName: string; phone: string | null; dni: string | null; role: string }) {
+  return { id: usuario.id, email: usuario.email, fullName: usuario.fullName, phone: usuario.phone, dni: usuario.dni, role: usuario.role };
 }
 
 async function emitirParDeTokens(idUsuario: string, correo: string, metaSolicitud: MetaSolicitud) {

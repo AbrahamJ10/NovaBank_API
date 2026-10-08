@@ -60,5 +60,5 @@ export async function manejadorPerfilPropio(peticion: SolicitudAutenticada, resp
     respuesta.status(404).json({ error: "Usuario no encontrado" });
     return;
   }
-  respuesta.json({ id: usuario.id, email: usuario.email, fullName: usuario.fullName, phone: usuario.phone, dni: usuario.dni });
+  respuesta.json({ id: usuario.id, email: usuario.email, fullName: usuario.fullName, phone: usuario.phone, dni: usuario.dni, role: usuario.role });
 }

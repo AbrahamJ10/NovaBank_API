@@ -66,6 +66,17 @@ export const auditLimiter = rateLimit({
   message: { error: "Demasiados eventos, intenta de nuevo más tarde." },
 });
 
+// Tráfico interno de staff, no de clientes — el techo es generoso porque
+// el riesgo real aquí no es abuso público (requiere rol ADMIN) sino que un
+// panel con varias pestañas abiertas refrescando datos no se bloquee solo.
+export const adminLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Demasiadas solicitudes, intenta de nuevo en unos minutos." },
+});
+
 // Generar un PDF de estado de cuenta es más pesado que una solicitud
 // típica — se mantiene aparte para que una ráfaga de solicitudes de estado
 // de cuenta no consuma también los intentos de restablecer contraseña de

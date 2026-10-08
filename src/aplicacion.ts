@@ -19,6 +19,7 @@ import { billsRouter } from "./modulos/recibos/recibos.rutas";
 import { withdrawalsRouter } from "./modulos/retiros/retiros.rutas";
 import { qrRouter } from "./modulos/qr/qr.rutas";
 import { auditRouter } from "./modulos/auditoria/auditoria.rutas";
+import { adminRouter } from "./modulos/administracion/administracion.rutas";
 
 export function crearApp() {
   const app = express();
@@ -50,6 +51,7 @@ export function crearApp() {
   app.use("/api/withdrawals", withdrawalsRouter);
   app.use("/api/qr", qrRouter);
   app.use("/api/audit", auditRouter);
+  app.use("/api/admin", adminRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

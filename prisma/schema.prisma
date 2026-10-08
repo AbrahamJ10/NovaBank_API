@@ -7,6 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Rol {
+  CLIENTE
+  ADMIN
+
+  @@map("rol_usuario")
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique @map("correo")
@@ -14,8 +21,13 @@ model User {
   dni       String?  @unique
   fullName  String   @map("nombre_completo")
   passwordHash String @map("contrasena_hash")
+  role      Rol      @default(CLIENTE) @map("rol")
 
   isActive  Boolean  @default(true) @map("esta_activo")
+  // Distinto de isActive=false (suspensión manual por un admin): esto es un
+  // soft-delete — la cuenta se da de baja, no se borra, para conservar el
+  // rastro de auditoría e historial de transacciones intacto.
+  deletedAt DateTime? @map("eliminado_en")
 
   // Bloqueo de cuenta por fuerza bruta
   failedLoginAttempts Int       @default(0) @map("intentos_fallidos")
