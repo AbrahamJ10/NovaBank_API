@@ -16,7 +16,6 @@ import { profileRouter } from "./modulos/perfil/perfil.rutas";
 import { securityRouter } from "./modulos/seguridad/seguridad.rutas";
 import { statementsRouter } from "./modulos/estadosCuenta/estadosCuenta.rutas";
 import { billsRouter } from "./modulos/recibos/recibos.rutas";
-import { withdrawalsRouter } from "./modulos/retiros/retiros.rutas";
 import { qrRouter } from "./modulos/qr/qr.rutas";
 import { auditRouter } from "./modulos/auditoria/auditoria.rutas";
 import { adminRouter } from "./modulos/administracion/administracion.rutas";
@@ -48,7 +47,6 @@ export function crearApp() {
   app.use("/api/security", securityRouter);
   app.use("/api/statements", statementsRouter);
   app.use("/api/bills", billsRouter);
-  app.use("/api/withdrawals", withdrawalsRouter);
   app.use("/api/qr", qrRouter);
   app.use("/api/audit", auditRouter);
   app.use("/api/admin", adminRouter);

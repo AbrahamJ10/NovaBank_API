@@ -14,8 +14,8 @@ export interface RecordAuditInput {
 }
 
 // Se llama desde dentro del servicio que ejecuta la acción (transferencias,
-// pagos de recibo, retiros, eventos de sesión/login, cambios de
-// perfil/seguridad, ...) justo después de que tenga éxito o falle — nunca
+// pagos de recibo, eventos de sesión/login, cambios de perfil/seguridad,
+// ...) justo después de que tenga éxito o falle — nunca
 // bloquea ni hace fallar la operación de fondo: una escritura de auditoría
 // rota no debe tumbar una solicitud real de movimiento de dinero, así que
 // los errores aquí solo se registran en el log.

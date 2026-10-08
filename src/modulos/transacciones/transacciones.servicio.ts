@@ -16,14 +16,13 @@ export type NuevaEntradaTransaccion = {
 };
 
 // El único lugar donde se escribe una transacción — todo endpoint futuro
-// que mueva dinero (transferencia, pago de recibo, QR, retiro) debe llamar
-// a esto para que la fila del historial y su notificación se creen juntas,
-// de forma atómica, dentro del mismo cliente db/tx que el cambio de saldo
-// que las causó. La fila del historial nunca es opcional; `notificacion`
-// sí lo es — quien llama y cuya categoría está controlada por una
-// preferencia de notificación del usuario (ver User.alertPurchase/
-// alertWithdraw) pasa null para omitirla ahí, mientras que la transacción
-// en sí siempre se registra.
+// que mueva dinero (transferencia, pago de recibo, QR) debe llamar a esto
+// para que la fila del historial y su notificación se creen juntas, de
+// forma atómica, dentro del mismo cliente db/tx que el cambio de saldo que
+// las causó. La fila del historial nunca es opcional; `notificacion` sí lo
+// es — quien llama y cuya categoría está controlada por una preferencia
+// de notificación del usuario (ver User.alertPurchase) pasa null para
+// omitirla ahí, mientras que la transacción en sí siempre se registra.
 export async function registrarTransaccion(
   db: Db,
   idUsuario: string,

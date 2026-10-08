@@ -7,7 +7,7 @@ import type { MetaSolicitud } from "../../libreria/metaSolicitud";
 
 export async function obtenerAlertas(idUsuario: string) {
   const usuario = await prisma.user.findUniqueOrThrow({ where: { id: idUsuario } });
-  return { compra: usuario.alertPurchase, retiro: usuario.alertWithdraw, login: usuario.alertLogin, promo: usuario.alertPromo };
+  return { compra: usuario.alertPurchase, login: usuario.alertLogin, promo: usuario.alertPromo };
 }
 
 export async function actualizarAlertas(idUsuario: string, entrada: EntradaActualizarAlertas, metaSolicitud?: MetaSolicitud) {
@@ -15,13 +15,12 @@ export async function actualizarAlertas(idUsuario: string, entrada: EntradaActua
     where: { id: idUsuario },
     data: {
       alertPurchase: entrada.compra,
-      alertWithdraw: entrada.retiro,
       alertLogin: entrada.login,
       alertPromo: entrada.promo,
     },
   });
   await registrarAuditoria({ userId: idUsuario, category: "SEGURIDAD", action: "alerts_updated", metadata: { ...entrada }, meta: metaSolicitud });
-  return { compra: actualizado.alertPurchase, retiro: actualizado.alertWithdraw, login: actualizado.alertLogin, promo: actualizado.alertPromo };
+  return { compra: actualizado.alertPurchase, login: actualizado.alertLogin, promo: actualizado.alertPromo };
 }
 
 export async function obtenerLimites(idUsuario: string) {

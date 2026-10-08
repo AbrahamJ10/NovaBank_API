@@ -35,12 +35,10 @@ model User {
 
   // Preferencias de notificación — se revisan en cada punto de uso antes de
   // crear una fila de Notification (alertPurchase en qr.service.payQr,
-  // alertWithdraw en withdrawals.service create/cancelWithdrawal, alertLogin
-  // en auth.service.registerSuccess); alertPromo todavía no tiene ninguna
-  // función de promociones que controlar. La transacción del historial nunca
-  // se filtra, solo la notificación.
+  // alertLogin en auth.service.registerSuccess); alertPromo todavía no
+  // tiene ninguna función de promociones que controlar. La transacción del
+  // historial nunca se filtra, solo la notificación.
   alertPurchase Boolean @default(true)  @map("alerta_compra")
-  alertWithdraw Boolean @default(true)  @map("alerta_retiro")
   alertLogin    Boolean @default(true)  @map("alerta_login")
   alertPromo    Boolean @default(false) @map("alerta_promo")
 
@@ -51,7 +49,6 @@ model User {
   notifications Notification[]
   payees        Payee[]
   bills         Bill[]
-  withdrawals   Withdrawal[]
   auditLogs     AuditLog[]
 
   createdAt DateTime @default(now()) @map("creado_en")
@@ -210,15 +207,13 @@ model Account {
   // Límites de gasto/controles geográficos. limitOnline se aplica en las
   // transferencias (la única salida real de dinero); los interruptores de
   // limitAtm/geo se guardan para la pantalla de Límites pero aún no se
-  // aplican — el retiro sin tarjeta todavía no está conectado al libro
-  // contable real.
+  // aplican a ningún movimiento real.
   limitOnline      Decimal  @default(1500) @db.Decimal(12, 2) @map("limite_en_linea")
   limitAtm         Decimal  @default(700)  @db.Decimal(12, 2) @map("limite_cajero")
   geoPeru          Boolean  @default(true)  @map("geo_peru")
   geoIntl          Boolean  @default(false) @map("geo_internacional")
 
   transactions     Transaction[]
-  withdrawals      Withdrawal[]
 
   createdAt DateTime @default(now()) @map("creado_en")
   updatedAt DateTime @updatedAt @map("actualizado_en")
@@ -238,7 +233,6 @@ enum TransactionCategory {
   TRANSFERENCIAS
   QR
   INGRESOS
-  RETIROS
   SERVICIOS
   PAGO_TARJETA
 
@@ -381,7 +375,6 @@ enum AuditCategory {
   NAVEGACION
   TRANSFERENCIA
   PAGO_SERVICIO
-  RETIRO
   TARJETA
   QR
   PERFIL
@@ -435,25 +428,3 @@ model AuditLog {
   @@map("auditoria")
 }
 
-// Una clave de retiro sin tarjeta. El monto se debita de inmediato cuando se
-// genera la clave (aquí no hay una red de cajeros real contra la cual
-// canjearla después) — cancelarla antes de que expire la reembolsa con una
-// transacción de crédito real, igual que revertir cualquier otro débito
-// real.
-model Withdrawal {
-  id         String    @id @default(uuid())
-  userId     String    @map("usuario_id")
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountId  String    @map("cuenta_id")
-  account    Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-
-  code       String    @unique @map("codigo")
-  amount     Decimal   @db.Decimal(12, 2) @map("monto")
-  expiresAt  DateTime  @map("expira_en")
-  cancelledAt DateTime? @map("cancelado_en")
-
-  createdAt  DateTime  @default(now()) @map("creado_en")
-
-  @@index([userId])
-  @@map("retiros_sin_tarjeta")
-}

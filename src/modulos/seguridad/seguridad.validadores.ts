@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const esquemaActualizarAlertas = z.object({
   compra: z.boolean(),
-  retiro: z.boolean(),
   login: z.boolean(),
   promo: z.boolean(),
 });
