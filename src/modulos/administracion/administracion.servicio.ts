@@ -1,5 +1,8 @@
 import bcrypt from "bcryptjs";
-import { Prisma, LoginEventResult, AuditCategory, TransactionKind, TransactionCategory } from "@prisma/client";
+import {
+  Prisma, LoginEventResult, AuditCategory, TransactionKind, TransactionCategory,
+  EstadoCasoSeguridad, PrioridadCaso, CategoriaCasoSeguridad,
+} from "@prisma/client";
 import { prisma } from "../../libreria/prisma";
 import { ErrorHttp } from "../../intermediarios/manejadorErrores";
 import { registrarAuditoria } from "../auditoria/auditoria.servicio";
@@ -42,6 +45,35 @@ function aUsuarioAdmin(u: {
 function asegurarNoAutoaccion(idAdmin: string, idObjetivo: string, accion: string) {
   if (idAdmin === idObjetivo) {
     throw new ErrorHttp(400, `No puedes ${accion} tu propia cuenta de administrador`);
+  }
+}
+
+// Bitácora específica de admin — aparte de registrarAuditoria (que sigue
+// escribiéndose también, para que la acción aparezca en el timeline
+// general de Auditoría). Nunca debe tumbar la acción real si falla.
+async function registrarAccionAdmin(entrada: {
+  adminId: string;
+  usuarioAfectadoId?: string | null;
+  accion: string;
+  valoresAntes?: Record<string, unknown> | null;
+  valoresDespues?: Record<string, unknown> | null;
+  descripcion?: string;
+  ip?: string;
+}): Promise<void> {
+  try {
+    await prisma.accionAdmin.create({
+      data: {
+        adminId: entrada.adminId,
+        usuarioAfectadoId: entrada.usuarioAfectadoId ?? null,
+        accion: entrada.accion,
+        valoresAntes: entrada.valoresAntes as Prisma.InputJsonValue | undefined,
+        valoresDespues: entrada.valoresDespues as Prisma.InputJsonValue | undefined,
+        descripcion: entrada.descripcion,
+        ip: entrada.ip,
+      },
+    });
+  } catch (error) {
+    console.error("No se pudo registrar la acción de admin", entrada.accion, error);
   }
 }
 
@@ -157,12 +189,15 @@ export async function obtenerUsuarioDetalle(id: string) {
   const usuario = await prisma.user.findUnique({ where: { id }, include: { account: true } });
   if (!usuario) throw new ErrorHttp(404, "Usuario no encontrado");
 
-  const [eventosLogin, auditoria, transacciones] = await Promise.all([
+  const [eventosLogin, auditoria, transacciones, notas, casos, historial] = await Promise.all([
     prisma.loginEvent.findMany({ where: { userId: id }, orderBy: { createdAt: "desc" }, take: 20 }),
     prisma.auditLog.findMany({ where: { userId: id }, orderBy: { createdAt: "desc" }, take: 20 }),
     usuario.account
       ? prisma.transaction.findMany({ where: { accountId: usuario.account.id }, orderBy: { createdAt: "desc" }, take: 20 })
       : Promise.resolve([]),
+    prisma.notaUsuario.findMany({ where: { usuarioId: id }, orderBy: { createdAt: "desc" }, include: { admin: { select: { fullName: true } } } }),
+    prisma.casoSeguridad.findMany({ where: { usuarioId: id }, orderBy: { createdAt: "desc" }, include: { adminAsignado: { select: { fullName: true } } } }),
+    prisma.historialCambio.findMany({ where: { usuarioId: id }, orderBy: { createdAt: "desc" }, take: 30, include: { admin: { select: { fullName: true } } } }),
   ]);
 
   return {
@@ -185,6 +220,16 @@ export async function obtenerUsuarioDetalle(id: string) {
     transacciones: transacciones.map((t) => ({
       id: t.id, name: t.name, amount: Number(t.amount), kind: t.kind, category: t.category, createdAt: t.createdAt,
     })),
+    notas: notas.map((n) => ({ id: n.id, contenido: n.contenido, adminNombre: n.admin.fullName, createdAt: n.createdAt })),
+    casos: casos.map((c) => ({
+      id: c.id, categoria: c.categoria, estado: c.estado, prioridad: c.prioridad, descripcion: c.descripcion,
+      resolucion: c.resolucion, adminAsignadoNombre: c.adminAsignado?.fullName ?? null,
+      createdAt: c.createdAt, updatedAt: c.updatedAt, cerradoEn: c.cerradoEn,
+    })),
+    historialCambios: historial.map((h) => ({
+      id: h.id, campo: h.campo, valorAnterior: h.valorAnterior, valorNuevo: h.valorNuevo,
+      adminNombre: h.admin?.fullName ?? null, createdAt: h.createdAt,
+    })),
   };
 }
 
@@ -197,20 +242,49 @@ export async function actualizarUsuario(
   const usuario = await prisma.user.findUnique({ where: { id } });
   if (!usuario || usuario.role !== "CLIENTE") throw new ErrorHttp(404, "Usuario no encontrado");
 
+  const nuevosValores: Record<string, string | null> = {
+    fullName: datos.fullName !== undefined ? datos.fullName.trim() : undefined as any,
+    email: datos.email !== undefined ? datos.email.trim().toLowerCase() : undefined as any,
+    phone: datos.phone !== undefined ? (!datos.phone ? null : datos.phone.trim()) : undefined as any,
+    dni: datos.dni !== undefined ? (!datos.dni ? null : datos.dni.trim()) : undefined as any,
+  };
+  // Un registro de historial por cada campo que de verdad cambió — no por
+  // cada campo que vino en la solicitud (el front puede mandar los cuatro
+  // aunque solo uno haya cambiado de verdad).
+  const CAMPO_LABEL: Record<string, string> = { fullName: "nombre completo", email: "correo", phone: "teléfono", dni: "DNI" };
+  const camposCambiados = (Object.keys(nuevosValores) as (keyof typeof nuevosValores)[]).filter(
+    (campo) => nuevosValores[campo] !== undefined && nuevosValores[campo] !== (usuario as any)[campo]
+  );
+
+  if (camposCambiados.length === 0) return aUsuarioAdmin(usuario);
+
   try {
     const actualizado = await prisma.user.update({
       where: { id },
-      data: {
-        fullName: datos.fullName?.trim(),
-        email: datos.email?.trim().toLowerCase(),
-        phone: datos.phone === "" ? null : datos.phone?.trim(),
-        dni: datos.dni === "" ? null : datos.dni?.trim(),
-      },
+      data: Object.fromEntries(camposCambiados.map((c) => [c, nuevosValores[c]])),
     });
+
+    await prisma.historialCambio.createMany({
+      data: camposCambiados.map((campo) => ({
+        usuarioId: id,
+        adminId: idAdmin,
+        campo: CAMPO_LABEL[campo] ?? campo,
+        valorAnterior: (usuario as any)[campo] ?? null,
+        valorNuevo: nuevosValores[campo],
+      })),
+    });
+
     await registrarAuditoria({
       userId: id, category: "SEGURIDAD", action: "admin_edito_datos", success: true,
       metadata: { adminId: idAdmin, cambios: datos }, meta,
     });
+    await registrarAccionAdmin({
+      adminId: idAdmin, usuarioAfectadoId: id, accion: "editar_datos",
+      valoresAntes: Object.fromEntries(camposCambiados.map((c) => [c, (usuario as any)[c] ?? null])),
+      valoresDespues: Object.fromEntries(camposCambiados.map((c) => [c, nuevosValores[c]])),
+      ip: meta.ip,
+    });
+
     return aUsuarioAdmin(actualizado);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -227,6 +301,7 @@ export async function suspenderUsuario(id: string, idAdmin: string, meta: MetaSo
 
   await prisma.user.update({ where: { id }, data: { isActive: false } });
   await registrarAuditoria({ userId: id, category: "SEGURIDAD", action: "admin_suspendio_cuenta", metadata: { adminId: idAdmin }, meta });
+  await registrarAccionAdmin({ adminId: idAdmin, usuarioAfectadoId: id, accion: "suspender_cuenta", valoresAntes: { isActive: true }, valoresDespues: { isActive: false }, ip: meta.ip });
   return { isActive: false };
 }
 
@@ -236,6 +311,7 @@ export async function activarUsuario(id: string, idAdmin: string, meta: MetaSoli
 
   await prisma.user.update({ where: { id }, data: { isActive: true } });
   await registrarAuditoria({ userId: id, category: "SEGURIDAD", action: "admin_activo_cuenta", metadata: { adminId: idAdmin }, meta });
+  await registrarAccionAdmin({ adminId: idAdmin, usuarioAfectadoId: id, accion: "activar_cuenta", valoresAntes: { isActive: false }, valoresDespues: { isActive: true }, ip: meta.ip });
   return { isActive: true };
 }
 
@@ -245,6 +321,11 @@ export async function desbloquearUsuario(id: string, idAdmin: string, meta: Meta
 
   await prisma.user.update({ where: { id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
   await registrarAuditoria({ userId: id, category: "SEGURIDAD", action: "admin_desbloqueo_cuenta", metadata: { adminId: idAdmin }, meta });
+  await registrarAccionAdmin({
+    adminId: idAdmin, usuarioAfectadoId: id, accion: "desbloquear_cuenta",
+    valoresAntes: { failedLoginAttempts: usuario.failedLoginAttempts, lockedUntil: usuario.lockedUntil },
+    valoresDespues: { failedLoginAttempts: 0, lockedUntil: null }, ip: meta.ip,
+  });
   return { lockedUntil: null };
 }
 
@@ -255,6 +336,7 @@ export async function eliminarUsuario(id: string, idAdmin: string, meta: MetaSol
 
   await prisma.user.update({ where: { id }, data: { isActive: false, deletedAt: new Date() } });
   await registrarAuditoria({ userId: id, category: "SEGURIDAD", action: "admin_elimino_cuenta", metadata: { adminId: idAdmin }, meta });
+  await registrarAccionAdmin({ adminId: idAdmin, usuarioAfectadoId: id, accion: "eliminar_cuenta", valoresAntes: { deletedAt: null }, valoresDespues: { deletedAt: new Date().toISOString() }, ip: meta.ip });
   return { deletedAt: new Date() };
 }
 
@@ -264,6 +346,7 @@ export async function restaurarUsuario(id: string, idAdmin: string, meta: MetaSo
 
   await prisma.user.update({ where: { id }, data: { deletedAt: null } });
   await registrarAuditoria({ userId: id, category: "SEGURIDAD", action: "admin_restauro_cuenta", metadata: { adminId: idAdmin }, meta });
+  await registrarAccionAdmin({ adminId: idAdmin, usuarioAfectadoId: id, accion: "restaurar_cuenta", valoresAntes: { deletedAt: usuario.deletedAt }, valoresDespues: { deletedAt: null }, ip: meta.ip });
   return { deletedAt: null };
 }
 
@@ -275,6 +358,7 @@ export async function restablecerContrasenaUsuario(id: string, idAdmin: string, 
   const passwordHash = await bcrypt.hash(nuevaContrasena, RONDAS_SAL_CONTRASENA);
   await prisma.user.update({ where: { id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
   await registrarAuditoria({ userId: id, category: "SEGURIDAD", action: "admin_restablecio_contrasena", metadata: { adminId: idAdmin }, meta });
+  await registrarAccionAdmin({ adminId: idAdmin, usuarioAfectadoId: id, accion: "restablecer_contrasena", descripcion: "Se generó una contraseña temporal", ip: meta.ip });
   return { temporaryPassword: nuevaContrasena };
 }
 
@@ -392,6 +476,143 @@ export async function listarTransaccionesGlobal(opts: {
       id: t.id, name: t.name, meta: t.meta, amount: Number(t.amount), kind: t.kind, category: t.category,
       createdAt: t.createdAt,
       userId: t.account.user?.id ?? null, userName: t.account.user?.fullName ?? null, userEmail: t.account.user?.email ?? null,
+    })),
+  };
+}
+
+// ---------- Notas internas ----------
+export async function crearNotaUsuario(usuarioId: string, idAdmin: string, contenido: string) {
+  const usuario = await prisma.user.findUnique({ where: { id: usuarioId } });
+  if (!usuario || usuario.role !== "CLIENTE") throw new ErrorHttp(404, "Usuario no encontrado");
+
+  const nota = await prisma.notaUsuario.create({
+    data: { usuarioId, adminId: idAdmin, contenido: contenido.trim() },
+    include: { admin: { select: { fullName: true } } },
+  });
+  await registrarAccionAdmin({ adminId: idAdmin, usuarioAfectadoId: usuarioId, accion: "agregar_nota", descripcion: contenido.trim() });
+  return { id: nota.id, contenido: nota.contenido, adminNombre: nota.admin.fullName, createdAt: nota.createdAt };
+}
+
+export async function eliminarNotaUsuario(notaId: string, idAdmin: string) {
+  const nota = await prisma.notaUsuario.findUnique({ where: { id: notaId } });
+  if (!nota) throw new ErrorHttp(404, "Nota no encontrada");
+
+  await prisma.notaUsuario.delete({ where: { id: notaId } });
+  await registrarAccionAdmin({ adminId: idAdmin, usuarioAfectadoId: nota.usuarioId, accion: "eliminar_nota", descripcion: nota.contenido });
+}
+
+// ---------- Casos de seguridad ----------
+export async function listarCasosSeguridad(opts: { estado?: string; prioridad?: string; busqueda?: string; pagina: number; limite: number }) {
+  const where: Prisma.CasoSeguridadWhereInput = {};
+  if (opts.estado) where.estado = opts.estado as EstadoCasoSeguridad;
+  if (opts.prioridad) where.prioridad = opts.prioridad as PrioridadCaso;
+  if (opts.busqueda) {
+    where.usuario = {
+      OR: [
+        { email: { contains: opts.busqueda, mode: "insensitive" } },
+        { fullName: { contains: opts.busqueda, mode: "insensitive" } },
+      ],
+    };
+  }
+
+  const [total, items] = await Promise.all([
+    prisma.casoSeguridad.count({ where }),
+    prisma.casoSeguridad.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (opts.pagina - 1) * opts.limite,
+      take: opts.limite,
+      include: { usuario: { select: { id: true, fullName: true, email: true } }, adminAsignado: { select: { fullName: true } } },
+    }),
+  ]);
+
+  return {
+    total, pagina: opts.pagina, limite: opts.limite,
+    items: items.map((c) => ({
+      id: c.id, categoria: c.categoria, estado: c.estado, prioridad: c.prioridad, descripcion: c.descripcion,
+      usuarioId: c.usuario.id, usuarioNombre: c.usuario.fullName, usuarioEmail: c.usuario.email,
+      adminAsignadoNombre: c.adminAsignado?.fullName ?? null, createdAt: c.createdAt, cerradoEn: c.cerradoEn,
+    })),
+  };
+}
+
+export async function crearCasoSeguridad(
+  usuarioId: string,
+  datos: { categoria: string; prioridad?: string; descripcion: string },
+  idAdmin: string
+) {
+  const usuario = await prisma.user.findUnique({ where: { id: usuarioId } });
+  if (!usuario || usuario.role !== "CLIENTE") throw new ErrorHttp(404, "Usuario no encontrado");
+
+  const caso = await prisma.casoSeguridad.create({
+    data: {
+      usuarioId,
+      categoria: datos.categoria as CategoriaCasoSeguridad,
+      prioridad: (datos.prioridad as PrioridadCaso) ?? undefined,
+      descripcion: datos.descripcion.trim(),
+      adminAsignadoId: idAdmin,
+    },
+  });
+  await registrarAccionAdmin({
+    adminId: idAdmin, usuarioAfectadoId: usuarioId, accion: "abrir_caso_seguridad",
+    descripcion: datos.descripcion.trim(), valoresDespues: { categoria: datos.categoria, prioridad: caso.prioridad },
+  });
+  return caso;
+}
+
+export async function actualizarCasoSeguridad(
+  casoId: string,
+  datos: { estado?: string; prioridad?: string; adminAsignadoId?: string | null; resolucion?: string },
+  idAdmin: string
+) {
+  const caso = await prisma.casoSeguridad.findUnique({ where: { id: casoId } });
+  if (!caso) throw new ErrorHttp(404, "Caso no encontrado");
+
+  const actualizado = await prisma.casoSeguridad.update({
+    where: { id: casoId },
+    data: {
+      estado: datos.estado as EstadoCasoSeguridad | undefined,
+      prioridad: datos.prioridad as PrioridadCaso | undefined,
+      adminAsignadoId: datos.adminAsignadoId,
+      resolucion: datos.resolucion,
+      cerradoEn: datos.estado === "CERRADO" ? new Date() : datos.estado ? null : undefined,
+    },
+  });
+  await registrarAccionAdmin({
+    adminId: idAdmin, usuarioAfectadoId: caso.usuarioId, accion: "actualizar_caso_seguridad",
+    valoresAntes: { estado: caso.estado, prioridad: caso.prioridad },
+    valoresDespues: { estado: actualizado.estado, prioridad: actualizado.prioridad },
+  });
+  return actualizado;
+}
+
+// ---------- Bitácora de acciones de administradores ----------
+export async function listarAccionesAdmin(opts: { adminId?: string; pagina: number; limite: number }) {
+  const where: Prisma.AccionAdminWhereInput = {};
+  if (opts.adminId) where.adminId = opts.adminId;
+
+  const [total, items] = await Promise.all([
+    prisma.accionAdmin.count({ where }),
+    prisma.accionAdmin.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (opts.pagina - 1) * opts.limite,
+      take: opts.limite,
+      include: {
+        admin: { select: { fullName: true, email: true } },
+        usuarioAfectado: { select: { fullName: true, email: true } },
+      },
+    }),
+  ]);
+
+  return {
+    total, pagina: opts.pagina, limite: opts.limite,
+    items: items.map((a) => ({
+      id: a.id, accion: a.accion, descripcion: a.descripcion,
+      valoresAntes: a.valoresAntes, valoresDespues: a.valoresDespues,
+      adminNombre: a.admin.fullName, adminEmail: a.admin.email,
+      usuarioAfectadoNombre: a.usuarioAfectado?.fullName ?? null, usuarioAfectadoEmail: a.usuarioAfectado?.email ?? null,
+      ip: a.ip, createdAt: a.createdAt,
     })),
   };
 }

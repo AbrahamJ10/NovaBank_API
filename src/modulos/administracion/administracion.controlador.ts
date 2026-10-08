@@ -127,3 +127,61 @@ export async function manejadorListarTransaccionesGlobal(peticion: Request, resp
   });
   respuesta.json(datos);
 }
+
+// ---------- Notas internas ----------
+const esquemaNota = z.object({ contenido: z.string().trim().min(1).max(2000) });
+
+export async function manejadorCrearNota(peticion: SolicitudAutenticada, respuesta: Response) {
+  const { contenido } = esquemaNota.parse(peticion.body);
+  const nota = await servicioAdmin.crearNotaUsuario(peticion.params.id, peticion.user!.id, contenido);
+  respuesta.status(201).json(nota);
+}
+
+export async function manejadorEliminarNota(peticion: SolicitudAutenticada, respuesta: Response) {
+  await servicioAdmin.eliminarNotaUsuario(peticion.params.notaId, peticion.user!.id);
+  respuesta.status(204).send();
+}
+
+// ---------- Casos de seguridad ----------
+export async function manejadorListarCasos(peticion: Request, respuesta: Response) {
+  const { pagina, limite } = esquemaPaginacion.parse(peticion.query);
+  const datos = await servicioAdmin.listarCasosSeguridad({
+    estado: strParam(peticion.query, "estado"),
+    prioridad: strParam(peticion.query, "prioridad"),
+    busqueda: strParam(peticion.query, "busqueda"),
+    pagina, limite,
+  });
+  respuesta.json(datos);
+}
+
+const esquemaCrearCaso = z.object({
+  categoria: z.enum(["FRAUDE", "CUENTA_COMPROMETIDA", "ACTIVIDAD_SOSPECHOSA", "OTRO"]),
+  prioridad: z.enum(["BAJA", "MEDIA", "ALTA"]).optional(),
+  descripcion: z.string().trim().min(3).max(2000),
+});
+
+export async function manejadorCrearCaso(peticion: SolicitudAutenticada, respuesta: Response) {
+  const datos = esquemaCrearCaso.parse(peticion.body);
+  const caso = await servicioAdmin.crearCasoSeguridad(peticion.params.id, datos, peticion.user!.id);
+  respuesta.status(201).json(caso);
+}
+
+const esquemaActualizarCaso = z.object({
+  estado: z.enum(["ABIERTO", "EN_REVISION", "CERRADO"]).optional(),
+  prioridad: z.enum(["BAJA", "MEDIA", "ALTA"]).optional(),
+  adminAsignadoId: z.string().uuid().optional().nullable(),
+  resolucion: z.string().trim().max(2000).optional(),
+});
+
+export async function manejadorActualizarCaso(peticion: SolicitudAutenticada, respuesta: Response) {
+  const datos = esquemaActualizarCaso.parse(peticion.body);
+  const caso = await servicioAdmin.actualizarCasoSeguridad(peticion.params.casoId, datos, peticion.user!.id);
+  respuesta.json(caso);
+}
+
+// ---------- Bitácora de acciones de administradores ----------
+export async function manejadorListarAccionesAdmin(peticion: Request, respuesta: Response) {
+  const { pagina, limite } = esquemaPaginacion.parse(peticion.query);
+  const datos = await servicioAdmin.listarAccionesAdmin({ adminId: strParam(peticion.query, "adminId"), pagina, limite });
+  respuesta.json(datos);
+}

@@ -51,6 +51,18 @@ model User {
   bills         Bill[]
   auditLogs     AuditLog[]
 
+  // Lado "admin actuó sobre esta cuenta de cliente" / "admin que hizo la
+  // acción" — dos relaciones distintas hacia el mismo modelo porque User
+  // juega ambos papeles según quién sea.
+  accionesComoAdmin   AccionAdmin[]     @relation("AccionesComoAdmin")
+  accionesRecibidas   AccionAdmin[]     @relation("AccionesRecibidas")
+  notasEscritas       NotaUsuario[]     @relation("NotasEscritas")
+  notasRecibidas      NotaUsuario[]     @relation("NotasDeUsuario")
+  casosComoUsuario    CasoSeguridad[]   @relation("CasosDeUsuario")
+  casosAsignados      CasoSeguridad[]   @relation("CasosAsignados")
+  cambiosRealizados   HistorialCambio[] @relation("CambiosRealizados")
+  historialPropio     HistorialCambio[] @relation("HistorialDeUsuario")
+
   createdAt DateTime @default(now()) @map("creado_en")
   updatedAt DateTime @updatedAt @map("actualizado_en")
 
@@ -426,5 +438,123 @@ model AuditLog {
   @@index([category, createdAt])
   @@index([action])
   @@map("auditoria")
+}
+
+// Bitácora específica de acciones de administración — distinta de AuditLog
+// (que registra TODA actividad de la plataforma, incluida la de clientes).
+// Esta solo existe para que "qué hizo cada administrador" se pueda
+// consultar directo, con los valores de antes/después como columnas
+// propias en vez de enterrados dentro de un JSON de metadata genérico.
+model AccionAdmin {
+  id                String   @id @default(uuid())
+  adminId           String   @map("admin_id")
+  admin             User     @relation("AccionesComoAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+  usuarioAfectadoId String?  @map("usuario_afectado_id")
+  usuarioAfectado   User?    @relation("AccionesRecibidas", fields: [usuarioAfectadoId], references: [id], onDelete: SetNull)
+
+  accion         String
+  valoresAntes   Json?   @map("valores_antes")
+  valoresDespues Json?   @map("valores_despues")
+  descripcion    String?
+  ip             String?
+
+  createdAt DateTime @default(now()) @map("creado_en")
+
+  @@index([adminId, createdAt])
+  @@index([usuarioAfectadoId, createdAt])
+  @@map("acciones_admin")
+}
+
+// Notas internas de soporte sobre una cuenta — nunca visibles para el
+// cliente, solo para el staff. Deliberadamente sin edición (solo crear o
+// borrar) para que la nota en sí quede como un registro honesto de qué se
+// dijo en el momento.
+model NotaUsuario {
+  id        String @id @default(uuid())
+  usuarioId String @map("usuario_id")
+  usuario   User   @relation("NotasDeUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+  adminId   String @map("admin_id")
+  admin     User   @relation("NotasEscritas", fields: [adminId], references: [id], onDelete: Cascade)
+
+  contenido String
+
+  createdAt DateTime @default(now()) @map("creado_en")
+
+  @@index([usuarioId, createdAt])
+  @@map("notas_usuario")
+}
+
+enum CategoriaCasoSeguridad {
+  FRAUDE
+  CUENTA_COMPROMETIDA
+  ACTIVIDAD_SOSPECHOSA
+  OTRO
+
+  @@map("categoria_caso_seguridad")
+}
+
+enum EstadoCasoSeguridad {
+  ABIERTO
+  EN_REVISION
+  CERRADO
+
+  @@map("estado_caso_seguridad")
+}
+
+enum PrioridadCaso {
+  BAJA
+  MEDIA
+  ALTA
+
+  @@map("prioridad_caso")
+}
+
+// Seguimiento formal de un caso de seguridad/fraude sobre una cuenta —
+// más estructurado que solo mirar el historial de logins: tiene estado,
+// prioridad, un admin asignado y una resolución final.
+model CasoSeguridad {
+  id        String @id @default(uuid())
+  usuarioId String @map("usuario_id")
+  usuario   User   @relation("CasosDeUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  categoria CategoriaCasoSeguridad
+  estado    EstadoCasoSeguridad    @default(ABIERTO)
+  prioridad PrioridadCaso          @default(MEDIA)
+
+  descripcion String
+  resolucion  String?
+
+  adminAsignadoId String? @map("admin_asignado_id")
+  adminAsignado   User?   @relation("CasosAsignados", fields: [adminAsignadoId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now()) @map("creado_en")
+  updatedAt DateTime  @updatedAt @map("actualizado_en")
+  cerradoEn DateTime? @map("cerrado_en")
+
+  @@index([usuarioId])
+  @@index([estado])
+  @@map("casos_seguridad")
+}
+
+// Un registro por campo cambiado — no una sola fila con "datos antiguos"
+// genéricos, para poder mostrar una línea de tiempo clara campo por campo
+// ("correo cambió de X a Y el 5 de octubre"). Solo cubre cambios hechos
+// por un admin desde el panel; los cambios que el propio cliente hace
+// desde la app (con su propio OTP) no pasan por aquí.
+model HistorialCambio {
+  id        String  @id @default(uuid())
+  usuarioId String  @map("usuario_id")
+  usuario   User    @relation("HistorialDeUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+  adminId   String? @map("admin_id")
+  admin     User?   @relation("CambiosRealizados", fields: [adminId], references: [id], onDelete: SetNull)
+
+  campo         String
+  valorAnterior String? @map("valor_anterior")
+  valorNuevo    String? @map("valor_nuevo")
+
+  createdAt DateTime @default(now()) @map("creado_en")
+
+  @@index([usuarioId, createdAt])
+  @@map("historial_cambios")
 }
 

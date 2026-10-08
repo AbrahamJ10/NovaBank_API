@@ -26,3 +26,12 @@ adminRouter.delete("/users/:id", asyncHandler(c.manejadorEliminarUsuario));
 adminRouter.get("/login-events", asyncHandler(c.manejadorListarEventosLogin));
 adminRouter.get("/audit-logs", asyncHandler(c.manejadorListarAuditoria));
 adminRouter.get("/transactions", asyncHandler(c.manejadorListarTransaccionesGlobal));
+
+adminRouter.post("/users/:id/notes", asyncHandler(c.manejadorCrearNota));
+adminRouter.delete("/notes/:notaId", asyncHandler(c.manejadorEliminarNota));
+
+adminRouter.get("/security-cases", asyncHandler(c.manejadorListarCasos));
+adminRouter.post("/users/:id/security-cases", asyncHandler(c.manejadorCrearCaso));
+adminRouter.patch("/security-cases/:casoId", asyncHandler(c.manejadorActualizarCaso));
+
+adminRouter.get("/admin-actions", asyncHandler(c.manejadorListarAccionesAdmin));
