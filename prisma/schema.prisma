@@ -212,16 +212,13 @@ model Account {
   availableBalance Decimal  @default(0) @db.Decimal(12, 2) @map("saldo_disponible")
   heldBalance      Decimal  @default(0) @db.Decimal(12, 2) @map("saldo_retenido")
   creditLine       Decimal  @default(0) @db.Decimal(12, 2) @map("linea_credito")
-  cardDebt         Decimal  @default(0) @db.Decimal(12, 2) @map("deuda_tarjeta")
   cutDay           Int      @default(28) @map("dia_corte")
   cardBlocked      Boolean  @default(false) @map("tarjeta_bloqueada")
 
-  // Límites de gasto/controles geográficos. limitOnline se aplica en las
-  // transferencias (la única salida real de dinero); los interruptores de
-  // limitAtm/geo se guardan para la pantalla de Límites pero aún no se
-  // aplican a ningún movimiento real.
+  // Límite de gasto en compras en línea — se aplica en las transferencias
+  // (la única salida real de dinero); los interruptores de geo se guardan
+  // para la pantalla de Límites pero aún no se aplican a ningún movimiento real.
   limitOnline      Decimal  @default(1500) @db.Decimal(12, 2) @map("limite_en_linea")
-  limitAtm         Decimal  @default(700)  @db.Decimal(12, 2) @map("limite_cajero")
   geoPeru          Boolean  @default(true)  @map("geo_peru")
   geoIntl          Boolean  @default(false) @map("geo_internacional")
 
@@ -246,7 +243,6 @@ enum TransactionCategory {
   QR
   INGRESOS
   SERVICIOS
-  PAGO_TARJETA
 
   @@map("categoria_transaccion")
 }

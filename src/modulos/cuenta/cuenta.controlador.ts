@@ -17,14 +17,6 @@ export async function manejadorBloqueoTarjeta(peticion: SolicitudAutenticada, re
   respuesta.json({ cardBlocked: tarjetaBloqueada });
 }
 
-const esquemaPagoTarjeta = z.object({ amount: z.number().positive() });
-
-export async function manejadorPagoTarjeta(peticion: SolicitudAutenticada, respuesta: Response) {
-  const { amount } = esquemaPagoTarjeta.parse(peticion.body);
-  const resumen = await servicioCuenta.pagarTarjeta(peticion.user!.id, amount, obtenerMetaSolicitud(peticion));
-  respuesta.json(resumen);
-}
-
 const esquemaRevelarCvv = z.object({ otpCode: z.string().regex(/^\d{6}$/, "El código debe tener 6 dígitos") });
 
 export async function manejadorRevelarCvv(peticion: SolicitudAutenticada, respuesta: Response) {

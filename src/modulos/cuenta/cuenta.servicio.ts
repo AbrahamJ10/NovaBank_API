@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../libreria/prisma";
 import { ErrorHttp } from "../../intermediarios/manejadorErrores";
-import { registrarTransaccion } from "../transacciones/transacciones.servicio";
 import { verificarOtpPerfil } from "../verificacion/otp.servicio";
 import { cifrar, descifrar } from "../../libreria/criptografia";
 import { registrarAuditoria } from "../auditoria/auditoria.servicio";
@@ -90,9 +89,6 @@ export async function obtenerResumenCuenta(idUsuario: string) {
   const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
   if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
 
-  const deudaTarjeta = Number(cuenta.cardDebt);
-  const pagoMinimo = deudaTarjeta > 0 ? Math.round(Math.max(deudaTarjeta * 0.05, 20) * 100) / 100 : 0;
-
   return {
     accountNumber: cuenta.accountNumber,
     cci: cuenta.cci,
@@ -101,8 +97,6 @@ export async function obtenerResumenCuenta(idUsuario: string) {
     availableBalance: Number(cuenta.availableBalance),
     heldBalance: Number(cuenta.heldBalance),
     creditLine: Number(cuenta.creditLine),
-    cardDebt: deudaTarjeta,
-    minPayment: pagoMinimo,
     cutDate: formatearFechaCorte(cuenta.cutDay),
     cardBlocked: cuenta.cardBlocked,
     memberSince: cuenta.createdAt,
@@ -140,55 +134,3 @@ export async function establecerBloqueoTarjeta(idUsuario: string, bloqueada: boo
   return actualizada.cardBlocked;
 }
 
-export async function pagarTarjeta(idUsuario: string, monto: number, metaSolicitud?: MetaSolicitud) {
-  const cuenta = await prisma.account.findUnique({ where: { userId: idUsuario } });
-  if (!cuenta) throw new ErrorHttp(404, "Cuenta no encontrada");
-
-  if (monto <= 0) throw new ErrorHttp(400, "El monto debe ser mayor a cero");
-  const deudaTarjeta = Number(cuenta.cardDebt);
-  if (monto > deudaTarjeta) throw new ErrorHttp(400, "El monto supera tu deuda actual");
-  if (Number(cuenta.availableBalance) < monto) {
-    await registrarAuditoria({
-      userId: idUsuario,
-      category: "TARJETA",
-      action: "card_payment_failed_insufficient_balance",
-      success: false,
-      metadata: { amount: monto },
-      meta: metaSolicitud,
-    });
-    throw new ErrorHttp(400, "Saldo insuficiente");
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.account.update({
-      where: { userId: idUsuario },
-      data: { availableBalance: { decrement: monto }, cardDebt: { decrement: monto } },
-    });
-    await registrarTransaccion(
-      tx,
-      idUsuario,
-      cuenta.id,
-      {
-        kind: "DEBIT",
-        category: "PAGO_TARJETA",
-        name: "Pago de tarjeta",
-        meta: "Pago de deuda de tarjeta de crédito",
-        amount: monto,
-        icon: "credit-card",
-        iconBg: "#EDF2F8",
-        iconFg: "#133A63",
-      },
-      {
-        title: "Pago de tarjeta realizado",
-        body: `Pagaste S/ ${monto.toFixed(2)} de tu tarjeta de crédito.`,
-        icon: "credit-card",
-        iconBg: "#EDF2F8",
-        iconFg: "#133A63",
-      }
-    );
-  });
-
-  await registrarAuditoria({ userId: idUsuario, category: "TARJETA", action: "card_payment_completed", metadata: { amount: monto }, meta: metaSolicitud });
-
-  return obtenerResumenCuenta(idUsuario);
-}

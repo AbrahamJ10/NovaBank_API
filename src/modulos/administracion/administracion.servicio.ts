@@ -208,7 +208,6 @@ export async function obtenerUsuarioDetalle(id: string) {
           cci: usuario.account.cci,
           availableBalance: Number(usuario.account.availableBalance),
           creditLine: Number(usuario.account.creditLine),
-          cardDebt: Number(usuario.account.cardDebt),
           cardBlocked: usuario.account.cardBlocked,
         }
       : null,

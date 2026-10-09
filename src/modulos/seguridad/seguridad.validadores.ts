@@ -8,7 +8,6 @@ export const esquemaActualizarAlertas = z.object({
 
 export const esquemaActualizarLimites = z.object({
   limitOnline: z.number().min(0).max(100000),
-  limitAtm: z.number().min(0).max(100000),
   geoPeru: z.boolean(),
   geoIntl: z.boolean(),
 });

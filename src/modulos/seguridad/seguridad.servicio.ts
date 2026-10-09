@@ -27,7 +27,6 @@ export async function obtenerLimites(idUsuario: string) {
   const cuenta = await prisma.account.findUniqueOrThrow({ where: { userId: idUsuario } });
   return {
     limitOnline: Number(cuenta.limitOnline),
-    limitAtm: Number(cuenta.limitAtm),
     geoPeru: cuenta.geoPeru,
     geoIntl: cuenta.geoIntl,
   };
@@ -38,7 +37,6 @@ export async function actualizarLimites(idUsuario: string, entrada: EntradaActua
     where: { userId: idUsuario },
     data: {
       limitOnline: entrada.limitOnline,
-      limitAtm: entrada.limitAtm,
       geoPeru: entrada.geoPeru,
       geoIntl: entrada.geoIntl,
     },
@@ -46,7 +44,6 @@ export async function actualizarLimites(idUsuario: string, entrada: EntradaActua
   await registrarAuditoria({ userId: idUsuario, category: "SEGURIDAD", action: "limits_updated", metadata: { ...entrada }, meta: metaSolicitud });
   return {
     limitOnline: Number(actualizada.limitOnline),
-    limitAtm: Number(actualizada.limitAtm),
     geoPeru: actualizada.geoPeru,
     geoIntl: actualizada.geoIntl,
   };
