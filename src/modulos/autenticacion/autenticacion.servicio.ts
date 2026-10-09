@@ -55,6 +55,20 @@ export async function registrar(entrada: EntradaRegistro, metaSolicitud: MetaSol
     throw new ErrorHttp(409, "Ya existe una cuenta con ese correo");
   }
 
+  if (entrada.phone) {
+    const telefonoEnUso = await prisma.user.findUnique({ where: { phone: entrada.phone } });
+    if (telefonoEnUso) {
+      throw new ErrorHttp(409, "Ya existe una cuenta con ese celular");
+    }
+  }
+
+  if (entrada.dni) {
+    const dniEnUso = await prisma.user.findUnique({ where: { dni: entrada.dni } });
+    if (dniEnUso) {
+      throw new ErrorHttp(409, "Ya existe una cuenta con ese DNI");
+    }
+  }
+
   await verificarOtpRegistro(entrada.email, entrada.otpCode);
 
   const hashContrasena = await bcrypt.hash(entrada.password, RONDAS_SAL_CONTRASENA);
